@@ -383,11 +383,8 @@ export default function DailyRecapPage() {
                   })}
 
                   <div>
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="mb-3">
                       <h3 className="font-semibold">Pengeluaran</h3>
-                      <Button type="button" size="sm" onClick={addLine}>
-                        <Plus className="w-4 h-4 mr-1" /> Tambah
-                      </Button>
                     </div>
 
                     <Tabs value={expenseTab} onValueChange={(v) => setExpenseTab(v as PaymentType)}>
@@ -413,34 +410,34 @@ export default function DailyRecapPage() {
                         {visibleLines.map((l) => {
                           const subtotal = l.unit_price * l.qty;
                           return (
-                            <div key={l.id} className="grid grid-cols-12 gap-2 items-center">
+                            <div key={l.id} className="grid grid-cols-12 gap-2 items-center rounded-lg border border-border/60 bg-background/50 p-2 md:border-0 md:bg-transparent md:p-0">
                               <Input
-                                className="col-span-12 md:col-span-5"
+                                className="col-span-12 md:col-span-6"
                                 placeholder="Nama Item"
                                 value={l.item_name}
                                 onChange={(e) => updateLine(l.id, { item_name: e.target.value })}
                               />
                               <MoneyInput
-                                className="col-span-5 md:col-span-3"
+                                className="col-span-7 md:col-span-3"
                                 placeholder="Rp 0"
                                 value={l.unit_price}
                                 onChange={(v) => updateLine(l.id, { unit_price: v })}
                               />
                               <Input
-                                className="col-span-3 md:col-span-2"
+                                className="col-span-3 md:col-span-1"
                                 type="number"
                                 inputMode="numeric"
                                 value={l.qty || ''}
                                 onChange={(e) => updateLine(l.id, { qty: Number(e.target.value) })}
                               />
-                              <div className="col-span-3 md:col-span-1 text-right font-medium text-sm">
+                              <div className="col-span-2 md:col-span-1 text-right font-medium text-sm whitespace-nowrap">
                                 {formatRp(subtotal)}
                               </div>
                               <Button
                                 type="button"
                                 size="icon"
                                 variant="ghost"
-                                className="col-span-1 md:col-span-1 h-9 w-9 text-destructive justify-self-end"
+                                className="col-span-12 md:col-span-1 h-9 w-full md:w-9 text-destructive justify-self-end"
                                 onClick={() => removeLine(l.id)}
                               >
                                 <X className="w-4 h-4" />
@@ -465,6 +462,12 @@ export default function DailyRecapPage() {
                         <span className="font-bold">Total Pengeluaran</span>
                         <span className="font-bold">{formatRp(totalExpense)}</span>
                       </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                      <Button type="button" variant="outline" onClick={addLine} className="w-full sm:w-auto">
+                        <Plus className="w-4 h-4 mr-1" /> Tambah Pengeluaran
+                      </Button>
                     </div>
 
                     <div className="mt-4 flex justify-end">
