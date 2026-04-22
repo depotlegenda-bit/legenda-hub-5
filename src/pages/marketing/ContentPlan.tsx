@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 import { Badge } from '@/components/ui/badge';
 import { Megaphone, Plus } from 'lucide-react';
 
@@ -40,7 +41,8 @@ export default function ContentPlanPage() {
     role === 'pic' ||
     (role ? getPerm(role, 'marketing.content', 'can_create', isCustom) : false);
   const [records, setRecords] = useState<any[]>([]);
-  const [form, setForm] = useState({ title: '', description: '', platform: 'instagram', scheduled_date: '', status: 'idea', rate_card: '' });
+  const contentDraft = usePersistentDraft('draft:content-plan-v1', { title: '', description: '', platform: 'instagram', scheduled_date: '', status: 'idea', rate_card: '' });
+  const [form, setForm] = useState(contentDraft.value);
   const [submitting, setSubmitting] = useState(false);
   const [engagementEdit, setEngagementEdit] = useState<Record<string, any>>({});
 
@@ -50,6 +52,9 @@ export default function ContentPlanPage() {
   };
 
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    contentDraft.setValue(form);
+  }, [contentDraft, form]);
 
   const formatRupiah = (n: number) => `Rp ${Math.round(n || 0).toLocaleString('id-ID')}`;
 
@@ -70,6 +75,7 @@ export default function ContentPlanPage() {
       toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Berhasil', description: 'Content plan ditambahkan.' });
+      contentDraft.clear({ title: '', description: '', platform: 'instagram', scheduled_date: '', status: 'idea', rate_card: '' });
       setForm({ title: '', description: '', platform: 'instagram', scheduled_date: '', status: 'idea', rate_card: '' });
       fetchData();
     }
