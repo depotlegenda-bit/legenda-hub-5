@@ -539,11 +539,6 @@ export default function FinancialReport() {
             <CollapsibleSection
               title={<span className="text-destructive">Rincian Pengeluaran</span>}
               icon={<Trash2 className="w-4 h-4 text-destructive shrink-0" />}
-              rightSlot={
-                <Button type="button" size="sm" onClick={(e) => { e.stopPropagation(); addExpenseRow(); }}>
-                  <Plus className="w-4 h-4 mr-1" /> Tambah
-                </Button>
-              }
             >
               <div className="space-y-4">
                 {/* Kelola Kategori */}
@@ -597,13 +592,22 @@ export default function FinancialReport() {
                       </div>
                       <div className="md:col-span-2 space-y-1">
                         <Label className="text-xs uppercase">Nota / Bukti</Label>
-                        <div className="flex items-center gap-3">
-                          <label className="cursor-pointer bg-primary/5 border-2 border-dashed border-primary/30 rounded-xl px-4 py-2 flex items-center gap-2 hover:bg-primary/10 transition flex-1 min-h-[44px]">
-                            <Camera className="w-4 h-4 text-primary shrink-0" />
-                            <span className="text-xs text-muted-foreground truncate">{exp.receipt_url ? 'Ganti foto nota' : 'Upload / Foto nota'}</span>
-                            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(exp.id, e.target.files[0])} />
-                          </label>
-                          {exp.receipt_url && <img src={exp.receipt_url} alt="nota" className="w-11 h-11 object-cover rounded border shrink-0" />}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                            <label className="cursor-pointer bg-primary/5 border-2 border-dashed border-primary/30 rounded-xl px-4 py-2 flex items-center gap-2 hover:bg-primary/10 transition flex-1 min-h-[44px]">
+                              <Camera className="w-4 h-4 text-primary shrink-0" />
+                              <span className="text-xs text-muted-foreground truncate">{exp.receipt_url ? 'Ganti foto nota' : 'Upload / Foto nota'}</span>
+                              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(exp.id, e.target.files[0])} />
+                            </label>
+                            {exp.receipt_url && <img src={exp.receipt_url} alt="nota" className="w-11 h-11 object-cover rounded border shrink-0" />}
+                          </div>
+                          {idx === expenses.length - 1 && (
+                            <div className="flex justify-end">
+                              <Button type="button" size="sm" variant="outline" onClick={addExpenseRow}>
+                                <Plus className="w-4 h-4 mr-1" /> Tambah
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
