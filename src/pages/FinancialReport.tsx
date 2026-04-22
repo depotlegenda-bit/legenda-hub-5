@@ -85,6 +85,7 @@ export default function FinancialReport() {
   const [submitting, setSubmitting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const draftHydratedRef = useRef(false);
 
   const [form, setForm] = useState(reportDraft.value.form);
 
@@ -127,12 +128,15 @@ export default function FinancialReport() {
 
   useEffect(() => { fetchReports(); }, [role]);
   useEffect(() => {
-    if (!selectedOutlet && reportDraft.value.selectedOutlet) {
+    if (!draftHydratedRef.current && !selectedOutlet && reportDraft.value.selectedOutlet) {
       setSelectedOutlet(reportDraft.value.selectedOutlet);
+      return;
     }
+    draftHydratedRef.current = true;
   }, [reportDraft.value.selectedOutlet, selectedOutlet, setSelectedOutlet]);
 
   useEffect(() => {
+    if (!draftHydratedRef.current) return;
     reportDraft.setValue({ selectedOutlet, form, expenses });
   }, [expenses, form, reportDraft, selectedOutlet]);
 
