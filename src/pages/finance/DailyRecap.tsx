@@ -448,32 +448,31 @@ export default function DailyRecapPage() {
                       </TabsContent>
                     </Tabs>
 
-                    {/* Totals */}
-                    <div className="mt-6 space-y-2 border-t border-border pt-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-semibold">Total Cash</span>
-                        <span className="font-semibold">{formatRp(totalCashExpense)}</span>
+                    <div className="mt-6 rounded-lg border border-border bg-muted/20 p-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="font-semibold">Total Cash</span>
+                          <span className="font-semibold">{formatRp(totalCashExpense)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm border-b border-border pb-3">
+                          <span className="font-semibold">Total Transfer</span>
+                          <span className="font-semibold">{formatRp(totalTransferExpense)}</span>
+                        </div>
+                        <div className="flex justify-between text-base">
+                          <span className="font-bold">Total Pengeluaran</span>
+                          <span className="font-bold">{formatRp(totalExpense)}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-sm border-b border-border pb-3">
-                        <span className="font-semibold">Total Transfer</span>
-                        <span className="font-semibold">{formatRp(totalTransferExpense)}</span>
-                      </div>
-                      <div className="flex justify-between text-base">
-                        <span className="font-bold">Total Pengeluaran</span>
-                        <span className="font-bold">{formatRp(totalExpense)}</span>
-                      </div>
-                    </div>
 
-                    <div className="mt-4 flex justify-end">
-                      <Button type="button" variant="outline" onClick={addLine} className="w-full sm:w-auto">
-                        <Plus className="w-4 h-4 mr-1" /> Tambah Pengeluaran
-                      </Button>
-                    </div>
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <Button type="button" variant="outline" onClick={addLine} className="w-full sm:w-[220px]">
+                          <Plus className="w-4 h-4 mr-1" /> Tambah Pengeluaran
+                        </Button>
 
-                    <div className="mt-4 flex justify-end">
-                      <Button onClick={handleSubmit} disabled={submitting || !canManage}>
-                        <Save className="w-4 h-4 mr-2" /> {submitting ? 'Menyimpan…' : 'Simpan Laporan'}
-                      </Button>
+                        <Button onClick={handleSubmit} disabled={submitting || !canManage} className="w-full sm:w-[220px]">
+                          <Save className="w-4 h-4 mr-2" /> {submitting ? 'Menyimpan…' : 'Simpan Laporan'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
