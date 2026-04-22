@@ -849,6 +849,47 @@ export type Database = {
           },
         ]
       }
+      outlet_materials: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          minimum_threshold: number
+          name: string
+          outlet_id: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          minimum_threshold?: number
+          name: string
+          outlet_id: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          minimum_threshold?: number
+          name?: string
+          outlet_id?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outlet_materials_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: false
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outlets: {
         Row: {
           created_at: string | null
