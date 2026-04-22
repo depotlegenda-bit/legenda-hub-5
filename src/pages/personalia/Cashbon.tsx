@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 import { Badge } from '@/components/ui/badge';
 import { Banknote, Plus, Check, X } from 'lucide-react';
 
@@ -19,8 +20,9 @@ export default function CashbonPage() {
   const canView = role === 'management' || role === 'pic';
   const [records, setRecords] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [amount, setAmount] = useState('');
-  const [notes, setNotes] = useState('');
+  const cashbonDraft = usePersistentDraft('draft:cashbon-page-v1', { amount: '', notes: '' });
+  const [amount, setAmount] = useState(cashbonDraft.value.amount);
+  const [notes, setNotes] = useState(cashbonDraft.value.notes);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
@@ -33,6 +35,9 @@ export default function CashbonPage() {
   };
 
   useEffect(() => { fetchData(); }, [role]);
+  useEffect(() => {
+    cashbonDraft.setValue({ amount, notes });
+  }, [amount, cashbonDraft, notes]);
 
   // Format number to Rp x.xxx.xxx (rounded, integer only)
   const rawAmount = parseInt(amount.replace(/\D/g, '')) || 0;
@@ -56,6 +61,7 @@ export default function CashbonPage() {
       toast({ title: 'Gagal', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Berhasil', description: 'Pengajuan cashbon dikirim.' });
+      cashbonDraft.clear({ amount: '', notes: '' });
       setAmount(''); setNotes('');
       fetchData();
     }
