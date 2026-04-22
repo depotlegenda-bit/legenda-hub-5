@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
+import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,15 +63,22 @@ interface RowState {
   dirty: boolean;
 }
 
+const createAttendanceDraft = () => ({
+  date: new Date().toISOString().split('T')[0],
+  selectedOutlet: '',
+  rows: {} as Record<string, RowState>,
+});
+
 export default function AttendancePage() {
   const { role } = useAuth();
   const canManageOutlets = role === 'management' || role === 'admin';
   const [mainTab, setMainTab] = useTabParam('input');
   const { toast } = useToast();
   const { outlets, selectedOutlet, setSelectedOutlet, loading: outletsLoading } = useOutlets();
+  const attendanceDraft = usePersistentDraft('draft:attendance-input-v1', createAttendanceDraft());
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [rows, setRows] = useState<Record<string, RowState>>({});
+  const [date, setDate] = useState<string>(attendanceDraft.value.date);
+  const [rows, setRows] = useState<Record<string, RowState>>(attendanceDraft.value.rows);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
@@ -91,11 +99,45 @@ export default function AttendancePage() {
 
   // Load attendance for date+outlet
   useEffect(() => {
+    if (!selectedOutlet && attendanceDraft.value.selectedOutlet) {
+      setSelectedOutlet(attendanceDraft.value.selectedOutlet);
+    }
+  }, [attendanceDraft.value.selectedOutlet, selectedOutlet, setSelectedOutlet]);
+
+  useEffect(() => {
+    attendanceDraft.setValue({ date, selectedOutlet, rows });
+  }, [attendanceDraft, date, rows, selectedOutlet]);
+
+  useEffect(() => {
     if (!selectedOutlet || outletProfiles.length === 0) {
       setRows({});
       setSelected({});
       return;
     }
+
+    if (attendanceDraft.hasStoredValue && attendanceDraft.value.selectedOutlet === selectedOutlet && attendanceDraft.value.date === date) {
+      const draftRowKeys = Object.keys(attendanceDraft.value.rows || {});
+      const outletUserIds = outletProfiles.map((p) => p.user_id);
+      const hasOutletDraft = draftRowKeys.some((uid) => outletUserIds.includes(uid));
+
+      if (hasOutletDraft) {
+        const next: Record<string, RowState> = {};
+        outletProfiles.forEach((p) => {
+          next[p.user_id] = attendanceDraft.value.rows[p.user_id] || {
+            status: 'H',
+            late_minutes: 0,
+            late_notes: '',
+            cashbon_amount: 0,
+            cashbon_notes: '',
+            dirty: false,
+          };
+        });
+        setRows(next);
+        setSelected({});
+        return;
+      }
+    }
+
     const userIds = outletProfiles.map((p) => p.user_id);
     supabase
       .from('attendance')
@@ -163,6 +205,7 @@ export default function AttendancePage() {
       toast({ title: `Tersimpan ${success}, gagal ${failed}`, variant: 'destructive' });
     } else {
       toast({ title: 'Berhasil', description: `${success} absensi tersimpan.` });
+      attendanceDraft.clear(createAttendanceDraft());
     }
     // Refresh
     setDate((d) => d);

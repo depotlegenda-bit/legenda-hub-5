@@ -19,6 +19,7 @@ import * as XLSX from 'xlsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import OutletReportRecap from '@/components/finance/OutletReportRecap';
+import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 
 interface ExpenseRow {
   id: string;
@@ -57,16 +58,9 @@ const parseNum = (v: string | number) => {
   return isNaN(n) ? 0 : n;
 };
 
-export default function FinancialReport() {
-  const { user, role } = useAuth();
-  const { toast } = useToast();
-  const [mainTab, setMainTab] = useTabParam('input');
-  const { outlets, selectedOutlet, setSelectedOutlet } = useOutlets();
-  const [submitting, setSubmitting] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
-
-  const [form, setForm] = useState({
+const createFinancialReportDraft = () => ({
+  selectedOutlet: '',
+  form: {
     report_date: new Date().toISOString().split('T')[0],
     reporter_name: '',
     shift: 'Full Day',
@@ -78,7 +72,22 @@ export default function FinancialReport() {
     gofood_sales: 0,
     grabfood_sales: 0,
     notes: '',
-  });
+  },
+  expenses: [{ id: '', description: '', category: DEFAULT_CATEGORIES[0], unit_price: 0, qty: 1, receipt_url: null as string | null }],
+});
+
+export default function FinancialReport() {
+  const { user, role } = useAuth();
+  const { toast } = useToast();
+  const [mainTab, setMainTab] = useTabParam('input');
+  const { outlets, selectedOutlet, setSelectedOutlet } = useOutlets();
+  const reportDraft = usePersistentDraft('draft:financial-report-v1', createFinancialReportDraft());
+  const [submitting, setSubmitting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const draftHydratedRef = useRef(false);
+
+  const [form, setForm] = useState(reportDraft.value.form);
 
   const newExp = (): ExpenseRow => ({
     id: `${Date.now()}-${Math.random()}`,
@@ -89,7 +98,11 @@ export default function FinancialReport() {
     receipt_url: null,
   });
 
-  const [expenses, setExpenses] = useState<ExpenseRow[]>([newExp()]);
+  const [expenses, setExpenses] = useState<ExpenseRow[]>(
+    reportDraft.value.expenses.length
+      ? reportDraft.value.expenses.map((expense) => ({ ...expense, id: expense.id || `${Date.now()}-${Math.random()}` }))
+      : [newExp()]
+  );
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [newCat, setNewCat] = useState('');
   const [reports, setReports] = useState<ReportRecord[]>([]);
@@ -114,6 +127,18 @@ export default function FinancialReport() {
   };
 
   useEffect(() => { fetchReports(); }, [role]);
+  useEffect(() => {
+    if (!draftHydratedRef.current && !selectedOutlet && reportDraft.value.selectedOutlet) {
+      setSelectedOutlet(reportDraft.value.selectedOutlet);
+      return;
+    }
+    draftHydratedRef.current = true;
+  }, [reportDraft.value.selectedOutlet, selectedOutlet, setSelectedOutlet]);
+
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+    reportDraft.setValue({ selectedOutlet, form, expenses });
+  }, [expenses, form, reportDraft, selectedOutlet]);
 
   // Totals
   const totalExpense = useMemo(() => expenses.reduce((s, e) => s + e.unit_price * e.qty, 0), [expenses]);
@@ -173,13 +198,8 @@ export default function FinancialReport() {
 
   const resetForm = () => {
     if (!confirm('Bersihkan formulir?')) return;
-    setForm({
-      report_date: new Date().toISOString().split('T')[0],
-      reporter_name: '', shift: 'Full Day',
-      starting_cash: 0, dine_in_omzet: 0, ending_physical_cash: 0, ending_qris_cash: 0,
-      shopeefood_sales: 0, gofood_sales: 0, grabfood_sales: 0, notes: '',
-    });
-    setExpenses([newExp()]);
+    reportDraft.clear(createFinancialReportDraft());
+    resetFormSilent();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,18 +250,14 @@ export default function FinancialReport() {
     }
 
     toast({ title: 'Berhasil!', description: 'Laporan tersimpan ke database.' });
+    reportDraft.clear(createFinancialReportDraft());
     resetFormSilent();
     setSubmitting(false);
     fetchReports();
   };
 
   const resetFormSilent = () => {
-    setForm({
-      report_date: new Date().toISOString().split('T')[0],
-      reporter_name: '', shift: 'Full Day',
-      starting_cash: 0, dine_in_omzet: 0, ending_physical_cash: 0, ending_qris_cash: 0,
-      shopeefood_sales: 0, gofood_sales: 0, grabfood_sales: 0, notes: '',
-    });
+    setForm(createFinancialReportDraft().form);
     setExpenses([newExp()]);
   };
 
