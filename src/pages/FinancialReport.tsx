@@ -127,6 +127,12 @@ export default function FinancialReport() {
 
   useEffect(() => { fetchReports(); }, [role]);
   useEffect(() => {
+    if (!selectedOutlet && reportDraft.value.selectedOutlet) {
+      setSelectedOutlet(reportDraft.value.selectedOutlet);
+    }
+  }, [reportDraft.value.selectedOutlet, selectedOutlet, setSelectedOutlet]);
+
+  useEffect(() => {
     reportDraft.setValue({ selectedOutlet, form, expenses });
   }, [expenses, form, reportDraft, selectedOutlet]);
 
@@ -240,6 +246,7 @@ export default function FinancialReport() {
     }
 
     toast({ title: 'Berhasil!', description: 'Laporan tersimpan ke database.' });
+    reportDraft.clear(createFinancialReportDraft());
     resetFormSilent();
     setSubmitting(false);
     fetchReports();
