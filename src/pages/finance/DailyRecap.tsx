@@ -43,6 +43,20 @@ const newLine = (payment_type: PaymentType): ExpenseLine => ({
 });
 
 const formatRp = (v: number) => `Rp ${(v || 0).toLocaleString('id-ID')}`;
+const createIncomeValuesFromConfig = (config: OutletFinanceConfig) => {
+  const init: Record<string, number> = {};
+  config.income_fields.forEach((field) => {
+    init[field.key] = 0;
+  });
+  (config.pair_groups || []).forEach((group) => {
+    group.platforms.forEach((platform) => {
+      init[`${group.left_prefix}_${platform.key}`] = 0;
+      init[`${group.right_prefix}_${platform.key}`] = 0;
+    });
+  });
+  return init;
+};
+
 const createDailyRecapDraft = () => ({
   activeOutlet: '',
   reportDate: new Date().toISOString().split('T')[0],
@@ -111,14 +125,7 @@ export default function DailyRecapPage() {
 
   // Reset income values when outlet (config) changes
   useEffect(() => {
-    const init: Record<string, number> = {};
-    activeConfig.income_fields.forEach((f) => { init[f.key] = 0; });
-    (activeConfig.pair_groups || []).forEach((pg) => {
-      pg.platforms.forEach((p) => {
-        init[`${pg.left_prefix}_${p.key}`] = 0;
-        init[`${pg.right_prefix}_${p.key}`] = 0;
-      });
-    });
+    const init = createIncomeValuesFromConfig(activeConfig);
     if (!hasRestoredDraftRef.current && dailyDraft.hasStoredValue && activeOutlet === dailyDraft.value.activeOutlet) {
       hasRestoredDraftRef.current = true;
       setIncomeValues((prev) => Object.keys(prev).length > 0 ? prev : { ...init, ...dailyDraft.value.incomeValues });
@@ -187,9 +194,7 @@ export default function DailyRecapPage() {
   const resetForm = () => {
     setReportDate(new Date().toISOString().split('T')[0]);
     setReporterName('');
-    const init: Record<string, number> = {};
-    activeConfig.income_fields.forEach((f) => { init[f.key] = 0; });
-    setIncomeValues(init);
+    setIncomeValues(createIncomeValuesFromConfig(activeConfig));
     setNotes('');
     setLines([newLine('cash')]);
     setExpenseTab('cash');
@@ -238,7 +243,10 @@ export default function DailyRecapPage() {
     if (itemsToInsert.length > 0) {
       const { error: itemErr } = await supabase.from('finance_expense_items').insert(itemsToInsert);
       if (itemErr) {
+        await supabase.from('finance_daily_reports').delete().eq('id', report.id);
+        setSubmitting(false);
         toast({ title: 'Item pengeluaran gagal disimpan', description: itemErr.message, variant: 'destructive' });
+        return;
       }
     }
 
