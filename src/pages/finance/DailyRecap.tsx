@@ -88,7 +88,10 @@ export default function DailyRecapPage() {
   const [lines, setLines] = useState<ExpenseLine[]>(dailyDraft.value.lines.length ? dailyDraft.value.lines : [newLine('cash')]);
   const [expenseTab, setExpenseTab] = useState<PaymentType>(dailyDraft.value.expenseTab);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const hasRestoredDraftRef = useRef(false);
+  const initialDraftRef = useRef(dailyDraft.value);
+  const hadStoredDraftRef = useRef(dailyDraft.hasStoredValue);
+  const restoredIncomeOutletRef = useRef<string | null>(null);
+  const previousOutletRef = useRef(dailyDraft.value.activeOutlet);
 
   // Resolve current outlet config (fallback to default)
   const activeConfig: OutletFinanceConfig = useMemo(() => {
@@ -125,14 +128,30 @@ export default function DailyRecapPage() {
 
   // Reset income values when outlet (config) changes
   useEffect(() => {
+    if (!activeOutlet) return;
+
     const init = createIncomeValuesFromConfig(activeConfig);
-    if (!hasRestoredDraftRef.current && dailyDraft.hasStoredValue && activeOutlet === dailyDraft.value.activeOutlet) {
-      hasRestoredDraftRef.current = true;
-      setIncomeValues((prev) => Object.keys(prev).length > 0 ? prev : { ...init, ...dailyDraft.value.incomeValues });
-      return;
-    }
-    setIncomeValues(init);
-  }, [activeOutlet, activeConfig.income_fields.length, activeConfig.pair_groups?.length]);
+    const outletChanged = previousOutletRef.current !== activeOutlet;
+    const shouldRestoreStoredIncome =
+      hadStoredDraftRef.current &&
+      activeOutlet === initialDraftRef.current.activeOutlet &&
+      restoredIncomeOutletRef.current !== activeOutlet;
+
+    setIncomeValues((prev) => {
+      if (shouldRestoreStoredIncome) {
+        restoredIncomeOutletRef.current = activeOutlet;
+        return { ...init, ...initialDraftRef.current.incomeValues };
+      }
+
+      if (outletChanged) {
+        return init;
+      }
+
+      return { ...init, ...prev };
+    });
+
+    previousOutletRef.current = activeOutlet;
+  }, [activeOutlet, activeConfig]);
 
   const fetchReports = async () => {
     if (!activeOutlet) return;
@@ -148,7 +167,7 @@ export default function DailyRecapPage() {
   useEffect(() => { fetchReports(); }, [activeOutlet]);
   useEffect(() => {
     dailyDraft.setValue({ activeOutlet, reportDate, reporterName, incomeValues, notes, lines, expenseTab });
-  }, [activeOutlet, dailyDraft, expenseTab, incomeValues, lines, notes, reportDate, reporterName]);
+  }, [activeOutlet, expenseTab, incomeValues, lines, notes, reportDate, reporterName]);
 
   // computed
   const cashLines = lines.filter((l) => l.payment_type === 'cash');
@@ -198,7 +217,9 @@ export default function DailyRecapPage() {
     setNotes('');
     setLines([newLine('cash')]);
     setExpenseTab('cash');
-    hasRestoredDraftRef.current = false;
+    hadStoredDraftRef.current = false;
+    restoredIncomeOutletRef.current = null;
+    previousOutletRef.current = activeOutlet;
   };
 
   const handleSubmit = async () => {
