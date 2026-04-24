@@ -796,6 +796,18 @@ export default function DailyRecapPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {role === 'admin' && editingReport && (
+              <EditReportDialog
+                report={editingReport}
+                config={activeConfig}
+                onClose={() => setEditingReport(null)}
+                onSaved={() => {
+                  setEditingReport(null);
+                  fetchReports();
+                }}
+              />
+            )}
           </TabsContent>
 
           {/* STATS TAB */}
