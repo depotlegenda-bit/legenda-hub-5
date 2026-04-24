@@ -121,15 +121,17 @@ const App = () => (
     <ThemeProvider>
       <AppSettingsProvider>
         <ViewModeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AuthProvider>
-                <AppRoutes />
-              </AuthProvider>
-            </BrowserRouter>
-          </TooltipProvider>
+          <SidebarCollapseProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AuthProvider>
+                  <AppRoutes />
+                </AuthProvider>
+              </BrowserRouter>
+            </TooltipProvider>
+          </SidebarCollapseProvider>
         </ViewModeProvider>
       </AppSettingsProvider>
     </ThemeProvider>
