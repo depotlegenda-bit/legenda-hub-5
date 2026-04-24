@@ -677,6 +677,7 @@ export default function DailyRecapPage() {
                         <th className="p-3 font-medium text-center uppercase text-xs tracking-wider">Selisih</th>
                         <th className="p-3 font-medium w-12" />
                         {role === 'admin' && <th className="p-3 font-medium w-12" />}
+                        {role === 'admin' && <th className="p-3 font-medium w-12" />}
                       </tr>
                     </thead>
                     <tbody>
