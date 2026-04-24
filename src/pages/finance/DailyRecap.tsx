@@ -297,15 +297,12 @@ export default function DailyRecapPage() {
   const addLine = () => setLines((prev) => [...prev, newLine(expenseTab)]);
 
   const resetForm = () => {
-    setReportDate(new Date().toISOString().split('T')[0]);
+    setReportDate(getTodayValue());
     setReporterName('');
     setIncomeValues(createIncomeValuesFromConfig(activeConfig));
     setNotes('');
     setLines([newLine('cash')]);
     setExpenseTab('cash');
-    hadStoredDraftRef.current = false;
-    restoredIncomeOutletRef.current = null;
-    previousOutletRef.current = activeOutlet;
   };
 
   const handleSubmit = async () => {
