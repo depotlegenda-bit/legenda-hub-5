@@ -10,7 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, Plus, Save, Trash2, X } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -166,6 +173,7 @@ export default function DailyRecapPage() {
   const [lines, setLines] = useState<ExpenseLine[]>(initialOutletDraft.lines);
   const [expenseTab, setExpenseTab] = useState<PaymentType>(initialOutletDraft.expenseTab);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [editingReport, setEditingReport] = useState<any | null>(null);
 
   // Resolve current outlet config (fallback to default)
   const activeConfig: OutletFinanceConfig = useMemo(() => {
@@ -669,6 +677,7 @@ export default function DailyRecapPage() {
                         <th className="p-3 font-medium text-center uppercase text-xs tracking-wider">Selisih</th>
                         <th className="p-3 font-medium w-12" />
                         {role === 'admin' && <th className="p-3 font-medium w-12" />}
+                        {role === 'admin' && <th className="p-3 font-medium w-12" />}
                       </tr>
                     </thead>
                     <tbody>
@@ -685,7 +694,7 @@ export default function DailyRecapPage() {
                           total_transfer_expense: tTransfer,
                         });
                         const isExpanded = !!expandedRows[r.id];
-                        const colSpan = role === 'admin' ? 7 : 6;
+                        const colSpan = role === 'admin' ? 8 : 6;
                         return (
                           <Fragment key={r.id}>
                             <tr
@@ -708,6 +717,13 @@ export default function DailyRecapPage() {
                                   className={cn('w-4 h-4 inline-block transition-transform text-muted-foreground', isExpanded && 'rotate-180')}
                                 />
                               </td>
+                              {role === 'admin' && (
+                                <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <Button size="icon" variant="ghost" onClick={() => setEditingReport(r)} title="Edit laporan">
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                </td>
+                              )}
                               {role === 'admin' && (
                                 <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
                                   <Button size="icon" variant="ghost" onClick={() => handleDelete(r.id)}>
@@ -770,7 +786,7 @@ export default function DailyRecapPage() {
                       })}
                       {reports.length === 0 && (
                         <tr>
-                          <td colSpan={role === 'admin' ? 7 : 6} className="p-8 text-center text-muted-foreground">
+                          <td colSpan={role === 'admin' ? 8 : 6} className="p-8 text-center text-muted-foreground">
                             Belum ada laporan untuk cabang ini.
                           </td>
                         </tr>
@@ -780,6 +796,18 @@ export default function DailyRecapPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {role === 'admin' && editingReport && (
+              <EditReportDialog
+                report={editingReport}
+                config={activeConfig}
+                onClose={() => setEditingReport(null)}
+                onSaved={() => {
+                  setEditingReport(null);
+                  fetchReports();
+                }}
+              />
+            )}
           </TabsContent>
 
           {/* STATS TAB */}
@@ -820,5 +848,259 @@ function OutletTabs({
         </button>
       ))}
     </div>
+  );
+}
+
+function EditReportDialog({
+  report,
+  config,
+  onClose,
+  onSaved,
+}: {
+  report: any;
+  config: OutletFinanceConfig;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [reportDate, setReportDate] = useState<string>(report.report_date || getTodayValue());
+  const [reporterName, setReporterName] = useState<string>(report.reporter_name || '');
+  const [notes, setNotes] = useState<string>(report.notes || '');
+  const [incomeValues, setIncomeValues] = useState<Record<string, number>>(() => ({
+    ...createIncomeValuesFromConfig(config),
+    ...Object.fromEntries(
+      Object.entries((report.extra_fields || {}) as Record<string, any>).map(([k, v]) => [k, Number(v) || 0]),
+    ),
+  }));
+  const [lines, setLines] = useState<ExpenseLine[]>(() => {
+    const items = (report.finance_expense_items || []) as any[];
+    const mapped: ExpenseLine[] = items.map((it) => ({
+      id: typeof it.id === 'string' ? it.id : crypto.randomUUID(),
+      payment_type: it.payment_type === 'transfer' ? 'transfer' : 'cash',
+      item_name: it.item_name || '',
+      unit_price: Number(it.unit_price) || 0,
+      qty: Number(it.qty) || 0,
+    }));
+    return mapped.length > 0 ? mapped : [newLine('cash')];
+  });
+  const [expenseTab, setExpenseTab] = useState<PaymentType>('cash');
+
+  const cashLines = lines.filter((l) => l.payment_type === 'cash');
+  const transferLines = lines.filter((l) => l.payment_type === 'transfer');
+  const totalCashExpense = cashLines.reduce((s, l) => s + l.unit_price * l.qty, 0);
+  const totalTransferExpense = transferLines.reduce((s, l) => s + l.unit_price * l.qty, 0);
+  const totalExpense = totalCashExpense + totalTransferExpense;
+  const visibleLines = lines.filter((l) => l.payment_type === expenseTab);
+
+  const updateLine = (id: string, patch: Partial<ExpenseLine>) => {
+    setLines((prev) => {
+      const next = prev.map((l) => (l.id === id ? { ...l, ...patch } : l));
+      const lastInTab = [...next].reverse().find((l) => l.payment_type === expenseTab);
+      if (lastInTab && lastInTab.id === id) {
+        const hasContent = (patch.item_name?.trim() ?? lastInTab.item_name.trim()) !== ''
+          || (patch.unit_price ?? lastInTab.unit_price) > 0
+          || (patch.qty ?? lastInTab.qty) > 0;
+        if (hasContent) next.push(newLine(expenseTab));
+      }
+      return next;
+    });
+  };
+  const removeLine = (id: string) => setLines((prev) => prev.filter((l) => l.id !== id));
+  const addLine = () => setLines((prev) => [...prev, newLine(expenseTab)]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error: updErr } = await supabase
+      .from('finance_daily_reports')
+      .update({
+        report_date: reportDate,
+        reporter_name: reporterName,
+        starting_cash: incomeValues['cash_start'] || 0,
+        cash_on_hand_added: incomeValues['cash_added'] || 0,
+        notes,
+        extra_fields: incomeValues,
+      })
+      .eq('id', report.id);
+
+    if (updErr) {
+      setSaving(false);
+      toast({ title: 'Gagal update laporan', description: updErr.message, variant: 'destructive' });
+      return;
+    }
+
+    const { error: delErr } = await supabase
+      .from('finance_expense_items')
+      .delete()
+      .eq('report_id', report.id);
+
+    if (delErr) {
+      setSaving(false);
+      toast({ title: 'Gagal hapus item lama', description: delErr.message, variant: 'destructive' });
+      return;
+    }
+
+    const itemsToInsert = lines
+      .filter((l) => l.item_name.trim() !== '' || l.unit_price > 0)
+      .map((l) => ({
+        report_id: report.id,
+        payment_type: l.payment_type,
+        item_name: l.item_name,
+        unit_price: l.unit_price,
+        qty: l.qty,
+        subtotal: l.unit_price * l.qty,
+      }));
+
+    if (itemsToInsert.length > 0) {
+      const { error: insErr } = await supabase.from('finance_expense_items').insert(itemsToInsert);
+      if (insErr) {
+        setSaving(false);
+        toast({ title: 'Gagal simpan item baru', description: insErr.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    setSaving(false);
+    toast({ title: 'Laporan diperbarui' });
+    onSaved();
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Laporan Harian</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label>Tanggal</Label>
+              <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
+            </div>
+            <div>
+              <Label>Nama Pelapor</Label>
+              <Input value={reporterName} onChange={(e) => setReporterName(e.target.value)} />
+            </div>
+          </div>
+
+          {config.income_fields.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {config.income_fields.map((f) => (
+                <div key={f.key}>
+                  <Label>{f.label}</Label>
+                  <MoneyInput
+                    value={incomeValues[f.key]}
+                    onChange={(v) => setIncomeValues((prev) => ({ ...prev, [f.key]: v }))}
+                    placeholder="Rp 0"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(config.pair_groups || []).map((pg) => (
+            <div key={pg.key} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { label: pg.left_label, prefix: pg.left_prefix },
+                { label: pg.right_label, prefix: pg.right_prefix },
+              ].map((col) => (
+                <div key={col.prefix} className="space-y-2">
+                  <h4 className="font-semibold text-sm">{col.label}</h4>
+                  {pg.platforms.map((p) => {
+                    const k = `${col.prefix}_${p.key}`;
+                    return (
+                      <div key={k}>
+                        <Label className="text-xs text-muted-foreground">{p.label}</Label>
+                        <MoneyInput
+                          value={incomeValues[k]}
+                          onChange={(v) => setIncomeValues((prev) => ({ ...prev, [k]: v }))}
+                          placeholder="Rp 0"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+
+          <div>
+            <h3 className="font-semibold mb-2">Pengeluaran</h3>
+            <Tabs value={expenseTab} onValueChange={(v) => setExpenseTab(v as PaymentType)}>
+              <TabsList>
+                <TabsTrigger value="cash">Cash</TabsTrigger>
+                <TabsTrigger value="transfer">Transfer</TabsTrigger>
+              </TabsList>
+              <TabsContent value={expenseTab} className="mt-3 space-y-2">
+                {visibleLines.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-3 text-center">Belum ada item.</p>
+                )}
+                {visibleLines.map((l) => {
+                  const subtotal = l.unit_price * l.qty;
+                  return (
+                    <div key={l.id} className="grid grid-cols-12 gap-2 items-center">
+                      <Input
+                        className="col-span-12 md:col-span-5"
+                        placeholder="Nama Item"
+                        value={l.item_name}
+                        onChange={(e) => updateLine(l.id, { item_name: e.target.value })}
+                      />
+                      <MoneyInput
+                        className="col-span-6 md:col-span-3"
+                        placeholder="Rp 0"
+                        value={l.unit_price}
+                        onChange={(v) => updateLine(l.id, { unit_price: v })}
+                      />
+                      <Input
+                        className="col-span-3 md:col-span-1"
+                        type="number"
+                        inputMode="numeric"
+                        value={l.qty || ''}
+                        onChange={(e) => updateLine(l.id, { qty: Number(e.target.value) })}
+                      />
+                      <div className="col-span-2 md:col-span-2 text-right text-sm font-medium whitespace-nowrap">
+                        {formatRp(subtotal)}
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="col-span-1 h-9 w-9 text-destructive justify-self-end"
+                        onClick={() => removeLine(l.id)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </TabsContent>
+            </Tabs>
+
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3 space-y-1 text-sm">
+              <div className="flex justify-between"><span>Total Cash</span><span className="font-semibold">{formatRp(totalCashExpense)}</span></div>
+              <div className="flex justify-between"><span>Total Transfer</span><span className="font-semibold">{formatRp(totalTransferExpense)}</span></div>
+              <div className="flex justify-between border-t border-border pt-1"><span className="font-bold">Total Pengeluaran</span><span className="font-bold">{formatRp(totalExpense)}</span></div>
+            </div>
+
+            <Button type="button" variant="outline" onClick={addLine} className="mt-3 w-full sm:w-auto">
+              <Plus className="w-4 h-4 mr-1" /> Tambah Pengeluaran
+            </Button>
+          </div>
+
+          <div>
+            <Label>Catatan</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Batal</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="w-4 h-4 mr-2" /> {saving ? 'Menyimpan…' : 'Simpan Perubahan'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
