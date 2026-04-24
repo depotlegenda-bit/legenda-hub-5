@@ -173,6 +173,7 @@ export default function DailyRecapPage() {
   const [lines, setLines] = useState<ExpenseLine[]>(initialOutletDraft.lines);
   const [expenseTab, setExpenseTab] = useState<PaymentType>(initialOutletDraft.expenseTab);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [editingReport, setEditingReport] = useState<any | null>(null);
 
   // Resolve current outlet config (fallback to default)
   const activeConfig: OutletFinanceConfig = useMemo(() => {
