@@ -7,6 +7,7 @@ import { AuthProvider, useAuth, AppRole } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSettingsProvider } from "@/hooks/useAppSettings";
 import { ViewModeProvider } from "@/hooks/useViewMode";
+import { SidebarCollapseProvider } from "@/hooks/useSidebarCollapse";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -120,15 +121,17 @@ const App = () => (
     <ThemeProvider>
       <AppSettingsProvider>
         <ViewModeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AuthProvider>
-                <AppRoutes />
-              </AuthProvider>
-            </BrowserRouter>
-          </TooltipProvider>
+          <SidebarCollapseProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AuthProvider>
+                  <AppRoutes />
+                </AuthProvider>
+              </BrowserRouter>
+            </TooltipProvider>
+          </SidebarCollapseProvider>
         </ViewModeProvider>
       </AppSettingsProvider>
     </ThemeProvider>
