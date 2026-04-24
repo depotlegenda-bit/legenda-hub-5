@@ -786,7 +786,7 @@ export default function DailyRecapPage() {
                       })}
                       {reports.length === 0 && (
                         <tr>
-                          <td colSpan={role === 'admin' ? 7 : 6} className="p-8 text-center text-muted-foreground">
+                          <td colSpan={role === 'admin' ? 8 : 6} className="p-8 text-center text-muted-foreground">
                             Belum ada laporan untuk cabang ini.
                           </td>
                         </tr>
