@@ -17,6 +17,7 @@ export default function AppSidebar() {
   const { role, signOut } = useAuth();
   const { settings } = useAppSettings();
   const { isEnabled } = useMenuPermissions();
+  const { collapsed, toggle } = useSidebarCollapse();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
