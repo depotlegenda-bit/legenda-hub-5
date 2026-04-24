@@ -73,10 +73,22 @@ export default function AppSidebar() {
         />
       )}
 
+      {/* Desktop: floating reopen button when sidebar is collapsed */}
+      {collapsed && (
+        <button
+          onClick={toggle}
+          aria-label="Tampilkan menu"
+          className="hidden md:flex fixed top-4 left-3 z-50 items-center justify-center w-9 h-9 rounded-full bg-sidebar text-sidebar-foreground border border-sidebar-border shadow-lg hover:bg-sidebar-accent transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
+
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 h-[100dvh] w-72 max-w-[85vw] bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 md:w-64 md:translate-x-0 md:z-40 shadow-2xl md:shadow-none',
-          open ? 'translate-x-0' : '-translate-x-full'
+          'fixed top-0 left-0 z-50 h-[100dvh] w-72 max-w-[85vw] bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 md:w-64 md:z-40 shadow-2xl md:shadow-none',
+          open ? 'translate-x-0' : '-translate-x-full',
+          collapsed ? 'md:-translate-x-full' : 'md:translate-x-0'
         )}
         style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
@@ -87,6 +99,15 @@ export default function AppSidebar() {
           aria-label="Tutup menu"
         >
           <X className="w-4 h-4" />
+        </button>
+        {/* Desktop-only collapse button */}
+        <button
+          className="hidden md:flex absolute top-3 right-3 z-10 p-2 rounded-lg bg-sidebar-accent/40 hover:bg-sidebar-accent text-sidebar-foreground items-center justify-center"
+          onClick={toggle}
+          aria-label="Sembunyikan menu"
+          title="Sembunyikan menu"
+        >
+          <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="p-6 border-b border-sidebar-border bg-sidebar-accent/30 flex flex-col items-center">
           <img
