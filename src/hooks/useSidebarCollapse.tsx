@@ -31,14 +31,8 @@ export function SidebarCollapseProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const noopCtx: SidebarCollapseContextValue = {
-  collapsed: false,
-  setCollapsed: () => {},
-  toggle: () => {},
-};
-
 export function useSidebarCollapse() {
   const ctx = useContext(SidebarCollapseContext);
-  // Fallback to no-op context to avoid crashes if a consumer renders outside the provider
-  return ctx ?? noopCtx;
+  if (!ctx) throw new Error('useSidebarCollapse must be used within SidebarCollapseProvider');
+  return ctx;
 }
