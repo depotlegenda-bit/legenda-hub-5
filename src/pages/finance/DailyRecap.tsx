@@ -694,7 +694,7 @@ export default function DailyRecapPage() {
                           total_transfer_expense: tTransfer,
                         });
                         const isExpanded = !!expandedRows[r.id];
-                        const colSpan = role === 'admin' ? 7 : 6;
+                        const colSpan = role === 'admin' ? 8 : 6;
                         return (
                           <Fragment key={r.id}>
                             <tr
