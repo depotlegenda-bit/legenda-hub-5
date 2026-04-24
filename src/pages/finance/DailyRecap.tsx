@@ -34,6 +34,20 @@ interface ExpenseLine {
   qty: number;
 }
 
+interface DailyRecapOutletDraft {
+  reportDate: string;
+  reporterName: string;
+  incomeValues: Record<string, number>;
+  notes: string;
+  lines: ExpenseLine[];
+  expenseTab: PaymentType;
+}
+
+interface DailyRecapDraftState {
+  activeOutlet: string;
+  draftsByOutlet: Record<string, DailyRecapOutletDraft>;
+}
+
 const newLine = (payment_type: PaymentType): ExpenseLine => ({
   id: crypto.randomUUID(),
   payment_type,
@@ -43,6 +57,10 @@ const newLine = (payment_type: PaymentType): ExpenseLine => ({
 });
 
 const formatRp = (v: number) => `Rp ${(v || 0).toLocaleString('id-ID')}`;
+const DAILY_RECAP_DRAFT_KEY = 'draft:daily-recap-v2';
+const LEGACY_DAILY_RECAP_DRAFT_KEY = 'draft:daily-recap-v1';
+const getTodayValue = () => new Date().toISOString().split('T')[0];
+
 const createIncomeValuesFromConfig = (config: OutletFinanceConfig) => {
   const init: Record<string, number> = {};
   config.income_fields.forEach((field) => {
@@ -57,14 +75,70 @@ const createIncomeValuesFromConfig = (config: OutletFinanceConfig) => {
   return init;
 };
 
-const createDailyRecapDraft = () => ({
-  activeOutlet: '',
-  reportDate: new Date().toISOString().split('T')[0],
+const createDailyRecapOutletDraft = (): DailyRecapOutletDraft => ({
+  reportDate: getTodayValue(),
   reporterName: '',
-  incomeValues: {} as Record<string, number>,
+  incomeValues: {},
   notes: '',
   lines: [newLine('cash')],
-  expenseTab: 'cash' as PaymentType,
+  expenseTab: 'cash',
+});
+
+const normalizeExpenseLines = (lines?: Partial<ExpenseLine>[]) => {
+  const normalized = (lines || []).map((line) => ({
+    id: typeof line.id === 'string' && line.id.length > 0 ? line.id : crypto.randomUUID(),
+    payment_type: line.payment_type === 'transfer' ? 'transfer' : 'cash',
+    item_name: typeof line.item_name === 'string' ? line.item_name : '',
+    unit_price: Number(line.unit_price) || 0,
+    qty: Number(line.qty) || 0,
+  } satisfies ExpenseLine));
+
+  return normalized.length > 0 ? normalized : [newLine('cash')];
+};
+
+const buildOutletDraft = (
+  config: OutletFinanceConfig,
+  draft?: Partial<DailyRecapOutletDraft> | null,
+): DailyRecapOutletDraft => ({
+  reportDate: typeof draft?.reportDate === 'string' && draft.reportDate ? draft.reportDate : getTodayValue(),
+  reporterName: typeof draft?.reporterName === 'string' ? draft.reporterName : '',
+  incomeValues: {
+    ...createIncomeValuesFromConfig(config),
+    ...Object.fromEntries(
+      Object.entries(draft?.incomeValues || {}).map(([key, value]) => [key, Number(value) || 0]),
+    ),
+  },
+  notes: typeof draft?.notes === 'string' ? draft.notes : '',
+  lines: normalizeExpenseLines(draft?.lines),
+  expenseTab: draft?.expenseTab === 'transfer' ? 'transfer' : 'cash',
+});
+
+const readLegacyDailyRecapDraft = (): DailyRecapDraftState => {
+  if (typeof window === 'undefined') return createDailyRecapDraft();
+
+  try {
+    const raw = localStorage.getItem(LEGACY_DAILY_RECAP_DRAFT_KEY);
+    if (!raw) return createDailyRecapDraft();
+
+    const parsed = JSON.parse(raw) as Partial<DailyRecapOutletDraft> & { activeOutlet?: string };
+    const legacyOutlet = typeof parsed.activeOutlet === 'string' ? parsed.activeOutlet : '';
+
+    if (!legacyOutlet) return createDailyRecapDraft();
+
+    return {
+      activeOutlet: legacyOutlet,
+      draftsByOutlet: {
+        [legacyOutlet]: buildOutletDraft({ outlet_id: legacyOutlet, ...DEFAULT_CONFIG }, parsed),
+      },
+    };
+  } catch {
+    return createDailyRecapDraft();
+  }
+};
+
+const createDailyRecapDraft = (): DailyRecapDraftState => ({
+  activeOutlet: '',
+  draftsByOutlet: {},
 });
 
 export default function DailyRecapPage() {
