@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Menu, ChevronDown, X } from 'lucide-react';
+import { LogOut, Menu, ChevronDown, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
@@ -11,6 +11,7 @@ import logoKop from '@/assets/logo-kop.png';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { MENU_GROUPS } from '@/lib/menuRegistry';
 import { useMenuPermissions } from '@/hooks/useMenuPermissions';
+import { useSidebarCollapse } from '@/hooks/useSidebarCollapse';
 
 export default function AppSidebar() {
   const { role, signOut } = useAuth();
