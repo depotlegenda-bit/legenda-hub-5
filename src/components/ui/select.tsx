@@ -30,13 +30,44 @@ const SelectTrigger = React.forwardRef<
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
+// Suppress Radix's hover-triggered autoscroll by blocking the pointer events
+// it relies on. Scrolling still works via mouse wheel, keyboard, and an
+// explicit click on the arrow (handled via onClick → manual scrollBy on the
+// nearest scrollable viewport ancestor).
+const stopHoverAutoScroll = (e: React.PointerEvent) => {
+  // Radix listens on pointermove/pointerenter to start the autoscroll loop.
+  // Preventing default + stopping propagation neutralizes that behavior
+  // without breaking click handling.
+  e.preventDefault();
+  e.stopPropagation();
+};
+
+const scrollViewportBy = (target: HTMLElement, delta: number) => {
+  // Find the Radix Select viewport (the actual scroll container).
+  const viewport =
+    (target.parentElement?.querySelector(
+      "[data-radix-select-viewport]",
+    ) as HTMLElement | null) ??
+    (target.closest("[data-radix-select-content]")?.querySelector(
+      "[data-radix-select-viewport]",
+    ) as HTMLElement | null);
+  viewport?.scrollBy({ top: delta, behavior: "smooth" });
+};
+
 const SelectScrollUpButton = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
->(({ className, ...props }, ref) => (
+>(({ className, onClick, ...props }, ref) => (
   <SelectPrimitive.ScrollUpButton
     ref={ref}
-    className={cn("flex cursor-default items-center justify-center py-1", className)}
+    className={cn("flex cursor-pointer items-center justify-center py-1", className)}
+    onPointerEnter={stopHoverAutoScroll}
+    onPointerMove={stopHoverAutoScroll}
+    onPointerLeave={stopHoverAutoScroll}
+    onClick={(e) => {
+      onClick?.(e);
+      scrollViewportBy(e.currentTarget, -80);
+    }}
     {...props}
   >
     <ChevronUp className="h-4 w-4" />
@@ -47,10 +78,17 @@ SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
 const SelectScrollDownButton = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
->(({ className, ...props }, ref) => (
+>(({ className, onClick, ...props }, ref) => (
   <SelectPrimitive.ScrollDownButton
     ref={ref}
-    className={cn("flex cursor-default items-center justify-center py-1", className)}
+    className={cn("flex cursor-pointer items-center justify-center py-1", className)}
+    onPointerEnter={stopHoverAutoScroll}
+    onPointerMove={stopHoverAutoScroll}
+    onPointerLeave={stopHoverAutoScroll}
+    onClick={(e) => {
+      onClick?.(e);
+      scrollViewportBy(e.currentTarget, 80);
+    }}
     {...props}
   >
     <ChevronDown className="h-4 w-4" />
