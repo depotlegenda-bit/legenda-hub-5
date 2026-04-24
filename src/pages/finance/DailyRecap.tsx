@@ -719,6 +719,13 @@ export default function DailyRecapPage() {
                               </td>
                               {role === 'admin' && (
                                 <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <Button size="icon" variant="ghost" onClick={() => setEditingReport(r)} title="Edit laporan">
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                </td>
+                              )}
+                              {role === 'admin' && (
+                                <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
                                   <Button size="icon" variant="ghost" onClick={() => handleDelete(r.id)}>
                                     <Trash2 className="w-4 h-4 text-destructive" />
                                   </Button>
