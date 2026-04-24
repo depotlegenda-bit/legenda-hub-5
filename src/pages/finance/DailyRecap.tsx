@@ -619,8 +619,30 @@ export default function DailyRecapPage() {
                       }
                       else groupTotal = sumGroup(g.fields);
 
+                      // Resolve label for a field key — first from income_fields, then from pair_groups
+                      const resolveFieldLabel = (key: string): string | null => {
+                        const inc = activeConfig.income_fields.find((f) => f.key === key);
+                        if (inc) return inc.label;
+                        for (const pg of activeConfig.pair_groups || []) {
+                          for (const p of pg.platforms) {
+                            if (key === `${pg.left_prefix}_${p.key}`) {
+                              const word = (pg.left_label.split(' ')[0] || pg.left_label).trim();
+                              return `${word} ${p.label}`;
+                            }
+                            if (key === `${pg.right_prefix}_${p.key}`) {
+                              const word = (pg.right_label.split(' ')[0] || pg.right_label).trim();
+                              return `${word} ${p.label}`;
+                            }
+                          }
+                        }
+                        return null;
+                      };
+
                       const fieldRows = (g.fields || [])
-                        .map((k) => activeConfig.income_fields.find((f) => f.key === k))
+                        .map((k) => {
+                          const label = resolveFieldLabel(k);
+                          return label ? { key: k, label } : null;
+                        })
                         .filter(Boolean) as { key: string; label: string }[];
 
                       return (
