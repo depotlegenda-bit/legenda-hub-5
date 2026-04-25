@@ -72,15 +72,15 @@ export default function MaterialControlPage() {
   const [usageEnd, setUsageEnd] = useState(today());
 
   const fetchData = async () => {
+    if (!selectedOutlet) {
+      setRecipes([]); setSales([]); setMaterials([]); setInventory([]);
+      return;
+    }
     const [{ data: r }, { data: s }, { data: m }, { data: inv }] = await Promise.all([
-      supabase.from('recipes').select('*').order('menu_item_name'),
-      supabase.from('daily_sales').select('*').order('sale_date', { ascending: false }).limit(500),
-      selectedOutlet
-        ? supabase.from('outlet_materials' as never).select('id, outlet_id, name, unit, minimum_threshold').eq('outlet_id', selectedOutlet).order('name')
-        : Promise.resolve({ data: [] as any }),
-      selectedOutlet
-        ? supabase.from('inventory').select('*').eq('outlet_id', selectedOutlet).order('record_date', { ascending: false }).limit(2000)
-        : Promise.resolve({ data: [] as any }),
+      supabase.from('recipes').select('*').eq('outlet_id', selectedOutlet).order('menu_item_name'),
+      supabase.from('daily_sales').select('*').eq('outlet_id', selectedOutlet).order('sale_date', { ascending: false }).limit(500),
+      supabase.from('outlet_materials' as never).select('id, outlet_id, name, unit, minimum_threshold').eq('outlet_id', selectedOutlet).order('name'),
+      supabase.from('inventory').select('*').eq('outlet_id', selectedOutlet).order('record_date', { ascending: false }).limit(2000),
     ]);
     if (r) setRecipes(r);
     if (s) setSales(s);
