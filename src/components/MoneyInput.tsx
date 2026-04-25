@@ -35,6 +35,8 @@ const parseID = (s: string, allowDecimal: boolean): number => {
   else cleaned = cleaned.replace(/[,]/g, '');
   // Sisakan hanya digit, minus, titik desimal.
   cleaned = cleaned.replace(/[^\d.\-]/g, '');
+  // Izinkan input parsial minus (hanya "-" atau "-." sementara) tanpa NaN.
+  if (cleaned === '-' || cleaned === '-.' || cleaned === '-,') return 0;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
 };
