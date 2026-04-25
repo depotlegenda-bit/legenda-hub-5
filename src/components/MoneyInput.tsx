@@ -57,7 +57,7 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         {...rest}
         ref={ref}
         type="text"
-        inputMode={allowDecimal ? 'decimal' : 'numeric'}
+        inputMode={allowDecimal ? 'decimal' : 'decimal'}
         className={cn(className)}
         placeholder={placeholder ?? (showRpPrefix ? 'Rp 0' : '0')}
         value={display}
@@ -72,9 +72,12 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         }}
         onChange={(e) => {
           const raw = e.target.value;
-          const num = parseID(raw, allowDecimal);
-          // Jaga tampilan: format ulang dengan separator saat mengetik.
-          setDraft(num === 0 && raw.trim() === '' ? '' : formatID(num, allowDecimal));
+          const allowedPattern = allowDecimal ? /[^\d.,\-]/g : /[^\d.\-]/g;
+          const sanitized = raw.replace(allowedPattern, '');
+          const num = parseID(sanitized, allowDecimal);
+          // Simpan draft input bersih (tanpa karakter ilegal) agar user bisa
+          // mengetik angka minus, desimal parsial, dsb tanpa di-reset tengah jalan.
+          setDraft(sanitized);
           onChange(num);
         }}
       />
