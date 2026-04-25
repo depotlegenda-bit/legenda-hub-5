@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/AppLayout';
@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -22,13 +21,36 @@ interface IngredientRow {
   unit: string;
 }
 
+interface OutletMaterial {
+  id: string;
+  outlet_id: string;
+  name: string;
+  unit: string;
+  minimum_threshold: number;
+}
+
+interface InventoryRecord {
+  id: string;
+  item_name: string;
+  starting_stock: number;
+  incoming_stock: number;
+  ending_stock: number;
+  record_date: string;
+  outlet_id: string | null;
+}
+
+const today = () => new Date().toISOString().split('T')[0];
+
 export default function MaterialControlPage() {
   const { user, role } = useAuth();
   const { toast } = useToast();
   const { outlets, selectedOutlet, setSelectedOutlet } = useOutlets();
-  const canEdit = role === 'management' || role === 'pic' || role === 'stockman';
+  const canEdit = role === 'admin' || role === 'management' || role === 'pic' || role === 'stockman';
+
   const [recipes, setRecipes] = useState<any[]>([]);
   const [sales, setSales] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<OutletMaterial[]>([]);
+  const [inventory, setInventory] = useState<InventoryRecord[]>([]);
 
   // Recipe form
   const [menuItem, setMenuItem] = useState('');
@@ -38,23 +60,44 @@ export default function MaterialControlPage() {
   // Sales form
   const [saleItem, setSaleItem] = useState('');
   const [qtySold, setQtySold] = useState('');
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [saleDate, setSaleDate] = useState(today());
   const [submitting, setSubmitting] = useState(false);
 
+  // Usage control filter
+  const firstOfMonth = () => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  };
+  const [usageStart, setUsageStart] = useState(firstOfMonth());
+  const [usageEnd, setUsageEnd] = useState(today());
+
   const fetchData = async () => {
-    const { data: r } = await supabase.from('recipes').select('*').order('menu_item_name');
+    const [{ data: r }, { data: s }, { data: m }, { data: inv }] = await Promise.all([
+      supabase.from('recipes').select('*').order('menu_item_name'),
+      supabase.from('daily_sales').select('*').order('sale_date', { ascending: false }).limit(500),
+      selectedOutlet
+        ? supabase.from('outlet_materials' as never).select('id, outlet_id, name, unit, minimum_threshold').eq('outlet_id', selectedOutlet).order('name')
+        : Promise.resolve({ data: [] as any }),
+      selectedOutlet
+        ? supabase.from('inventory').select('*').eq('outlet_id', selectedOutlet).order('record_date', { ascending: false }).limit(2000)
+        : Promise.resolve({ data: [] as any }),
+    ]);
     if (r) setRecipes(r);
-    const { data: s } = await supabase.from('daily_sales').select('*').order('sale_date', { ascending: false }).limit(200);
     if (s) setSales(s);
+    setMaterials(((m as unknown as OutletMaterial[]) || []));
+    setInventory(((inv as InventoryRecord[]) || []));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [selectedOutlet]);
+
+  const materialNames = useMemo(() => Array.from(new Set(materials.map((m) => m.name))), [materials]);
+  const materialUnitMap = useMemo(() => new Map(materials.map((m) => [m.name.toLowerCase(), m.unit])), [materials]);
 
   const handleRecipeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setSubmitting(true);
-    const ingredientsData = ingredients.filter(i => i.name.trim()).map(i => ({ name: i.name, qty: parseFloat(i.qty) || 0, unit: i.unit }));
+    const ingredientsData = ingredients.filter(i => i.name.trim()).map(i => ({ name: i.name.trim(), qty: parseFloat(i.qty) || 0, unit: i.unit }));
     const { error } = await supabase.from('recipes').insert({
       menu_item_name: menuItem,
       outlet_id: selectedOutlet,
@@ -95,38 +138,87 @@ export default function MaterialControlPage() {
   const addIngredient = () => setIngredients([...ingredients, { name: '', qty: '', unit: 'gram' }]);
   const removeIngredient = (idx: number) => setIngredients(ingredients.filter((_, i) => i !== idx));
   const updateIngredient = (idx: number, field: keyof IngredientRow, value: string) => {
-    const updated = [...ingredients]; updated[idx][field] = value; setIngredients(updated);
+    const updated = [...ingredients];
+    updated[idx][field] = value;
+    // Auto-fill unit if name matches a known material
+    if (field === 'name') {
+      const u = materialUnitMap.get(value.trim().toLowerCase());
+      if (u) updated[idx].unit = u;
+    }
+    setIngredients(updated);
   };
 
-  // Calculate material usage vs actual
+  const handleDeleteRecipe = async (id: string) => {
+    const { error } = await supabase.from('recipes').delete().eq('id', id);
+    if (error) toast({ title: 'Gagal hapus', description: error.message, variant: 'destructive' });
+    else { toast({ title: 'Resep dihapus' }); fetchData(); }
+  };
+
+  const handleDeleteSale = async (id: string) => {
+    const { error } = await supabase.from('daily_sales').delete().eq('id', id);
+    if (error) toast({ title: 'Gagal hapus', description: error.message, variant: 'destructive' });
+    else { toast({ title: 'Penjualan dihapus' }); fetchData(); }
+  };
+
+  // Calculate material usage: Estimasi (resep × penjualan) vs Aktual (awal+masuk-akhir) per material
   const calcUsage = () => {
     const recipeMap = new Map(recipes.map(r => [r.menu_item_name, r]));
-    const materialUsage: Record<string, { expected: number; unit: string }> = {};
+    const result: Record<string, { estimasi: number; aktual: number; unit: string }> = {};
 
-    sales.forEach(sale => {
+    // 1. Estimasi dari penjualan × resep (filter rentang tanggal & outlet)
+    const filteredSales = sales.filter((s) => {
+      if (selectedOutlet && s.outlet_id !== selectedOutlet) return false;
+      return s.sale_date >= usageStart && s.sale_date <= usageEnd;
+    });
+
+    filteredSales.forEach(sale => {
       const recipe = recipeMap.get(sale.menu_item_name);
       if (!recipe) return;
       const ings = recipe.ingredients as { name: string; qty: number; unit: string }[];
       ings?.forEach(ing => {
-        if (!materialUsage[ing.name]) materialUsage[ing.name] = { expected: 0, unit: ing.unit };
-        materialUsage[ing.name].expected += (ing.qty / (recipe.portions || 1)) * sale.qty_sold;
+        if (!result[ing.name]) result[ing.name] = { estimasi: 0, aktual: 0, unit: ing.unit };
+        result[ing.name].estimasi += (ing.qty / (recipe.portions || 1)) * sale.qty_sold;
       });
     });
 
-    return materialUsage;
+    // 2. Aktual dari inventory: jumlahkan (starting + incoming - ending) per item dalam rentang
+    const filteredInv = inventory.filter((i) => i.record_date >= usageStart && i.record_date <= usageEnd);
+    filteredInv.forEach((inv) => {
+      const consumed = (Number(inv.starting_stock) || 0) + (Number(inv.incoming_stock) || 0) - (Number(inv.ending_stock) || 0);
+      if (!result[inv.item_name]) {
+        const u = materialUnitMap.get(inv.item_name.toLowerCase()) || '';
+        result[inv.item_name] = { estimasi: 0, aktual: 0, unit: u };
+      }
+      result[inv.item_name].aktual += consumed;
+    });
+
+    // Pastikan semua bahan master tampil meski 0
+    materials.forEach((m) => {
+      if (!result[m.name]) result[m.name] = { estimasi: 0, aktual: 0, unit: m.unit };
+    });
+
+    return result;
   };
 
   const usage = calcUsage();
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <h1 className="text-2xl md:text-3xl font-bold font-sans flex items-center gap-3">
             <Beaker className="w-7 h-7" /> Kontrol Bahan Baku
           </h1>
           <OutletSelector outlets={outlets} selectedOutlet={selectedOutlet} onSelect={setSelectedOutlet} />
         </div>
+
+        {!canEdit && (
+          <Card className="border-warning/50 bg-warning/5">
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              Mode lihat saja. Hanya admin, management, PIC, dan stockman yang dapat menambah resep / penjualan.
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="usage">
           <TabsList>
@@ -137,28 +229,60 @@ export default function MaterialControlPage() {
 
           <TabsContent value="usage">
             <Card className="glass-card">
-              <CardHeader><CardTitle className="text-lg">Estimasi Penggunaan Bahan</CardTitle></CardHeader>
-              <CardContent>
+              <CardHeader>
+                <CardTitle className="text-lg">Estimasi vs Aktual Penggunaan Bahan</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Estimasi = (qty resep ÷ porsi) × jumlah menu terjual. Aktual = (Stok awal + Stok masuk) − Stok akhir. Selisih = Aktual − Estimasi (positif = waste / kebocoran).
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3 items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Dari Tanggal</Label>
+                    <Input type="date" value={usageStart} onChange={(e) => setUsageStart(e.target.value)} className="w-40 h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Sampai Tanggal</Label>
+                    <Input type="date" value={usageEnd} onChange={(e) => setUsageEnd(e.target.value)} className="w-40 h-9" />
+                  </div>
+                </div>
+
                 {Object.keys(usage).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Belum ada data. Input resep dan penjualan terlebih dahulu.</p>
+                  <p className="text-sm text-muted-foreground">Belum ada data. Pastikan ada bahan baku di Stok & Inventaris, resep, dan penjualan.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border text-left text-muted-foreground">
                           <th className="p-3 font-medium">Bahan</th>
-                          <th className="p-3 font-medium">Estimasi Penggunaan</th>
+                          <th className="p-3 font-medium text-right">Estimasi</th>
+                          <th className="p-3 font-medium text-right">Aktual</th>
+                          <th className="p-3 font-medium text-right">Selisih</th>
                           <th className="p-3 font-medium">Satuan</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(usage).map(([name, data]) => (
-                          <tr key={name} className="border-b border-border/50 hover:bg-muted/30">
-                            <td className="p-3 font-medium">{name}</td>
-                            <td className="p-3">{data.expected.toFixed(1)}</td>
-                            <td className="p-3">{data.unit}</td>
-                          </tr>
-                        ))}
+                        {Object.entries(usage)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([name, data]) => {
+                            const selisih = data.aktual - data.estimasi;
+                            const selisihColor = Math.abs(selisih) < 0.01
+                              ? 'text-muted-foreground'
+                              : selisih > 0
+                                ? 'text-destructive'
+                                : 'text-success';
+                            return (
+                              <tr key={name} className="border-b border-border/50 hover:bg-muted/30">
+                                <td className="p-3 font-medium">{name}</td>
+                                <td className="p-3 text-right">{data.estimasi.toFixed(2)}</td>
+                                <td className="p-3 text-right">{data.aktual.toFixed(2)}</td>
+                                <td className={`p-3 text-right font-bold ${selisihColor}`}>
+                                  {selisih > 0 ? '+' : ''}{selisih.toFixed(2)}
+                                </td>
+                                <td className="p-3">{data.unit}</td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
@@ -195,7 +319,6 @@ export default function MaterialControlPage() {
                         return { menu, portions, ingredient: { name: ingName, qty, unit: (r.unit || 'gram').trim() } };
                       }}
                       onImport={async (rows) => {
-                        // Group by menu_item_name
                         const grouped = new Map<string, { portions: number; ingredients: any[] }>();
                         rows.forEach((r) => {
                           if (!grouped.has(r.menu)) grouped.set(r.menu, { portions: r.portions, ingredients: [] });
@@ -217,6 +340,11 @@ export default function MaterialControlPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {materials.length === 0 && (
+                    <div className="mb-4 p-3 rounded-lg bg-warning/10 border border-warning/30 text-xs text-muted-foreground">
+                      Belum ada master bahan baku untuk cabang ini. Tambahkan dulu di menu <strong>Stok & Inventaris → Kelola Bahan</strong> agar dropdown bahan terisi.
+                    </div>
+                  )}
                   <form onSubmit={handleRecipeSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -233,11 +361,20 @@ export default function MaterialControlPage() {
                         <Label>Bahan-bahan</Label>
                         <Button type="button" variant="outline" size="sm" onClick={addIngredient}><Plus className="w-3 h-3 mr-1" /> Bahan</Button>
                       </div>
+                      <datalist id="material-name-list">
+                        {materialNames.map((n) => <option key={n} value={n} />)}
+                      </datalist>
                       {ingredients.map((ing, idx) => (
                         <div key={idx} className="flex gap-2 items-end">
-                          <Input className="flex-1" placeholder="Nama bahan" value={ing.name} onChange={(e) => updateIngredient(idx, 'name', e.target.value)} />
-                          <Input className="w-20" type="number" placeholder="Qty" value={ing.qty} onChange={(e) => updateIngredient(idx, 'qty', e.target.value)} />
-                          <Input className="w-20" placeholder="Satuan" value={ing.unit} onChange={(e) => updateIngredient(idx, 'unit', e.target.value)} />
+                          <Input
+                            list="material-name-list"
+                            className="flex-1"
+                            placeholder="Nama bahan (pilih dari master atau ketik manual)"
+                            value={ing.name}
+                            onChange={(e) => updateIngredient(idx, 'name', e.target.value)}
+                          />
+                          <Input className="w-24" type="number" step="0.01" placeholder="Qty" value={ing.qty} onChange={(e) => updateIngredient(idx, 'qty', e.target.value)} />
+                          <Input className="w-24" placeholder="Satuan" value={ing.unit} onChange={(e) => updateIngredient(idx, 'unit', e.target.value)} />
                           {ingredients.length > 1 && (
                             <Button type="button" variant="ghost" size="icon" onClick={() => removeIngredient(idx)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
                           )}
@@ -266,13 +403,20 @@ export default function MaterialControlPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {recipes.map((r) => (
-                  <div key={r.id} className="p-3 bg-muted/50 rounded-lg">
-                    <p className="font-medium">{r.menu_item_name} <span className="text-xs text-muted-foreground">({r.portions} porsi)</span></p>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {(r.ingredients as any[])?.map((ing: any, i: number) => (
-                        <Badge key={i} variant="outline" className="text-xs">{ing.name}: {ing.qty} {ing.unit}</Badge>
-                      ))}
+                  <div key={r.id} className="p-3 bg-muted/50 rounded-lg flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">{r.menu_item_name} <span className="text-xs text-muted-foreground">({r.portions} porsi)</span></p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {(r.ingredients as any[])?.map((ing: any, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">{ing.name}: {ing.qty} {ing.unit}</Badge>
+                        ))}
+                      </div>
                     </div>
+                    {canEdit && (
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteRecipe(r.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 ))}
                 {recipes.length === 0 && <p className="text-sm text-muted-foreground">Belum ada resep.</p>}
@@ -291,8 +435,8 @@ export default function MaterialControlPage() {
                       headers={['sale_date', 'menu_item_name', 'qty_sold']}
                       templateFilename="template-penjualan-harian"
                       sampleRows={[
-                        [new Date().toISOString().split('T')[0], 'Es Kopi Susu', 25],
-                        [new Date().toISOString().split('T')[0], 'Nasi Goreng', 12],
+                        [today(), 'Es Kopi Susu', 25],
+                        [today(), 'Nasi Goreng', 12],
                       ]}
                       parseRow={(r) => {
                         const date = (r.sale_date || '').trim();
@@ -378,6 +522,7 @@ export default function MaterialControlPage() {
                         <th className="p-3 font-medium">Tanggal</th>
                         <th className="p-3 font-medium">Menu</th>
                         <th className="p-3 font-medium">Terjual</th>
+                        {canEdit && <th className="p-3 font-medium w-12"></th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -386,10 +531,17 @@ export default function MaterialControlPage() {
                           <td className="p-3">{s.sale_date}</td>
                           <td className="p-3">{s.menu_item_name}</td>
                           <td className="p-3 font-bold">{s.qty_sold}</td>
+                          {canEdit && (
+                            <td className="p-3">
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteSale(s.id)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                       {sales.length === 0 && (
-                        <tr><td colSpan={3} className="p-8 text-center text-muted-foreground">Belum ada data penjualan.</td></tr>
+                        <tr><td colSpan={canEdit ? 4 : 3} className="p-8 text-center text-muted-foreground">Belum ada data penjualan.</td></tr>
                       )}
                     </tbody>
                   </table>
