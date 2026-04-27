@@ -52,6 +52,8 @@ interface PLCategory {
 
 export default function ProfitLossPage() {
   const { toast } = useToast();
+  const { role } = useAuth();
+  const canBulkAssign = role === 'admin' || role === 'management';
   const { outlets, selectedOutlet, setSelectedOutlet } = useOutlets();
   const [mainTab, setMainTab] = useTabParam('input');
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'));
