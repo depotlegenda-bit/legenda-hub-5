@@ -441,7 +441,44 @@ export default function ProfitLossPage() {
               ))}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2 items-center">
+              {canBulkAssign && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportUnassignedCsv}
+                    disabled={unassignedExpenseRows.length === 0}
+                    title="Export CSV item Belum Diassign untuk diisi di Excel"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Export Belum Diassign ({unassignedExpenseRows.length})
+                  </Button>
+                  <CsvImportButton<{ id: string; category: string }>
+                    entityLabel="Assign Kategori"
+                    templateFilename="belum-diassign-template"
+                    headers={['id', 'tanggal', 'outlet', 'deskripsi', 'qty', 'unit_price', 'subtotal', 'category']}
+                    sampleRows={[
+                      ['<id-otomatis-jangan-diubah>', '2025-01-15', 'Outlet A', 'Bawang Merah', 2, 15000, 30000, 'Bahan Baku'],
+                    ]}
+                    helperText="Hanya kolom 'category' yang akan di-update. Baris dengan kategori kosong atau akun yang belum terdaftar akan dilewati."
+                    parseRow={(raw) => {
+                      const id = (raw['id'] || '').trim();
+                      const category = (raw['category'] || '').trim();
+                      if (!id) throw new Error("Kolom 'id' wajib diisi");
+                      if (!category) throw new Error("Kolom 'category' kosong");
+                      const matched = expenseCategories.find(
+                        (c) => c.name.toLowerCase() === category.toLowerCase(),
+                      );
+                      if (!matched) {
+                        throw new Error(`Akun "${category}" belum ada. Tambahkan di "Tambah Akun" dulu.`);
+                      }
+                      return { id, category: matched.name };
+                    }}
+                    onImport={handleImportCategories}
+                  />
+                </>
+              )}
               <Button onClick={handleSaveAll} disabled={saving || Object.keys(pendingChanges).length === 0}>
                 <Save className="w-4 h-4 mr-1" />
                 {saving ? 'Menyimpan...' : `Simpan Perubahan (${Object.keys(pendingChanges).length})`}
