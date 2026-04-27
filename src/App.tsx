@@ -7,6 +7,7 @@ import { AuthProvider, useAuth, AppRole } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSettingsProvider } from "@/hooks/useAppSettings";
 import { ViewModeProvider } from "@/hooks/useViewMode";
+import { useMenuPermissions } from "@/hooks/useMenuPermissions";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -46,12 +47,29 @@ import ContentPlanPage from "./pages/marketing/ContentPlan";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: AppRole[] }) {
+function ProtectedRoute({
+  children,
+  allowedRoles,
+  menuKey,
+}: {
+  children: React.ReactNode;
+  allowedRoles?: AppRole[];
+  /** When set, access is checked against role_menu_permissions (admin-configurable). */
+  menuKey?: string;
+}) {
   const { user, role, loading } = useAuth();
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Memuat...</div>;
+  const { isEnabled, loading: permsLoading } = useMenuPermissions();
+  if (loading || (menuKey && permsLoading))
+    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Memuat...</div>;
   if (!user) return <Navigate to="/login" replace />;
   // Admin selalu boleh akses semua route
   if (role === 'admin') return <>{children}</>;
+  // Source of truth: DB-configured menu permissions (when menuKey provided)
+  if (menuKey && role) {
+    if (!isEnabled(role, menuKey)) return <Navigate to="/profile" replace />;
+    return <>{children}</>;
+  }
+  // Fallback: legacy hardcoded allowedRoles
   if (allowedRoles && role && !allowedRoles.includes(role)) return <Navigate to="/profile" replace />;
   return <>{children}</>;
 }
@@ -71,39 +89,39 @@ function AppRoutes() {
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
       {/* Dashboard */}
-      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['management']}><DashboardPage /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute menuKey="dashboard.analytics" allowedRoles={['management']}><DashboardPage /></ProtectedRoute>} />
 
       {/* Personalia */}
-      <Route path="/personalia/staff" element={<ProtectedRoute allowedRoles={['management', 'pic']}><StaffManagement /></ProtectedRoute>} />
-      <Route path="/personalia/performance" element={<ProtectedRoute allowedRoles={['management', 'pic']}><PerformanceReviewPage /></ProtectedRoute>} />
-      <Route path="/personalia/attendance" element={<ProtectedRoute allowedRoles={['management', 'pic']}><AttendancePage /></ProtectedRoute>} />
-      <Route path="/attendance/check-in" element={<ProtectedRoute><CheckInPage /></ProtectedRoute>} />
-      <Route path="/personalia/cashbon" element={<ProtectedRoute><CashbonPage /></ProtectedRoute>} />
-      <Route path="/personalia/punishment" element={<ProtectedRoute allowedRoles={['management', 'pic']}><PunishmentPage /></ProtectedRoute>} />
-      <Route path="/personalia/leave" element={<ProtectedRoute allowedRoles={['management', 'pic']}><LeaveVerificationPage /></ProtectedRoute>} />
-      <Route path="/personalia/payroll" element={<ProtectedRoute allowedRoles={['management', 'pic']}><PayrollPage /></ProtectedRoute>} />
-      <Route path="/personalia/roles" element={<ProtectedRoute allowedRoles={['admin', 'management']}><RoleManagementPage /></ProtectedRoute>} />
-      <Route path="/activity-log" element={<ProtectedRoute allowedRoles={['management']}><ActivityLogPage /></ProtectedRoute>} />
+      <Route path="/personalia/staff" element={<ProtectedRoute menuKey="personalia.staff" allowedRoles={['management', 'pic']}><StaffManagement /></ProtectedRoute>} />
+      <Route path="/personalia/performance" element={<ProtectedRoute menuKey="personalia.performance" allowedRoles={['management', 'pic']}><PerformanceReviewPage /></ProtectedRoute>} />
+      <Route path="/personalia/attendance" element={<ProtectedRoute menuKey="personalia.attendance" allowedRoles={['management', 'pic']}><AttendancePage /></ProtectedRoute>} />
+      <Route path="/attendance/check-in" element={<ProtectedRoute menuKey="personalia.checkin"><CheckInPage /></ProtectedRoute>} />
+      <Route path="/personalia/cashbon" element={<ProtectedRoute menuKey="personalia.cashbon"><CashbonPage /></ProtectedRoute>} />
+      <Route path="/personalia/punishment" element={<ProtectedRoute menuKey="personalia.punishment" allowedRoles={['management', 'pic']}><PunishmentPage /></ProtectedRoute>} />
+      <Route path="/personalia/leave" element={<ProtectedRoute menuKey="personalia.leave" allowedRoles={['management', 'pic']}><LeaveVerificationPage /></ProtectedRoute>} />
+      <Route path="/personalia/payroll" element={<ProtectedRoute menuKey="personalia.payroll" allowedRoles={['management', 'pic']}><PayrollPage /></ProtectedRoute>} />
+      <Route path="/personalia/roles" element={<ProtectedRoute menuKey="roles.manage" allowedRoles={['admin', 'management']}><RoleManagementPage /></ProtectedRoute>} />
+      <Route path="/activity-log" element={<ProtectedRoute menuKey="personalia.activity" allowedRoles={['management']}><ActivityLogPage /></ProtectedRoute>} />
 
       {/* Finance */}
-      <Route path="/finance/daily-recap" element={<ProtectedRoute allowedRoles={['management', 'pic']}><DailyRecapPage /></ProtectedRoute>} />
-      <Route path="/finance/profit-loss" element={<ProtectedRoute allowedRoles={['management', 'pic']}><ProfitLossPage /></ProtectedRoute>} />
-      <Route path="/finance/invoice" element={<ProtectedRoute allowedRoles={['management', 'pic']}><InvoicePage /></ProtectedRoute>} />
-      <Route path="/finance/note-archive" element={<ProtectedRoute allowedRoles={['management', 'pic']}><NoteArchivePage /></ProtectedRoute>} />
+      <Route path="/finance/daily-recap" element={<ProtectedRoute menuKey="finance.daily" allowedRoles={['management', 'pic']}><DailyRecapPage /></ProtectedRoute>} />
+      <Route path="/finance/profit-loss" element={<ProtectedRoute menuKey="finance.profit_loss" allowedRoles={['management', 'pic']}><ProfitLossPage /></ProtectedRoute>} />
+      <Route path="/finance/invoice" element={<ProtectedRoute menuKey="finance.invoice" allowedRoles={['management', 'pic']}><InvoicePage /></ProtectedRoute>} />
+      <Route path="/finance/note-archive" element={<ProtectedRoute menuKey="finance.note_archive" allowedRoles={['management', 'pic']}><NoteArchivePage /></ProtectedRoute>} />
 
       {/* Inventory */}
-      <Route path="/inventory/daily-stock" element={<ProtectedRoute allowedRoles={['management', 'pic', 'stockman', 'staff']}><InventoryPage /></ProtectedRoute>} />
-      <Route path="/inventory/shopping-list" element={<ProtectedRoute allowedRoles={['management', 'pic', 'stockman']}><ShoppingListPage /></ProtectedRoute>} />
-      <Route path="/inventory/material-control" element={<ProtectedRoute allowedRoles={['management', 'pic', 'stockman']}><MaterialControlPage /></ProtectedRoute>} />
+      <Route path="/inventory/daily-stock" element={<ProtectedRoute menuKey="inventory.daily" allowedRoles={['management', 'pic', 'stockman', 'staff']}><InventoryPage /></ProtectedRoute>} />
+      <Route path="/inventory/shopping-list" element={<ProtectedRoute menuKey="inventory.shopping" allowedRoles={['management', 'pic', 'stockman']}><ShoppingListPage /></ProtectedRoute>} />
+      <Route path="/inventory/material-control" element={<ProtectedRoute menuKey="inventory.material" allowedRoles={['management', 'pic', 'stockman']}><MaterialControlPage /></ProtectedRoute>} />
 
       {/* Daily Report */}
-      <Route path="/daily-report" element={<ProtectedRoute><FinancialReport /></ProtectedRoute>} />
+      <Route path="/daily-report" element={<ProtectedRoute menuKey="daily_report.input"><FinancialReport /></ProtectedRoute>} />
 
       {/* Marketing */}
-      <Route path="/marketing/content-plan" element={<ProtectedRoute allowedRoles={['management', 'pic']}><ContentPlanPage /></ProtectedRoute>} />
+      <Route path="/marketing/content-plan" element={<ProtectedRoute menuKey="marketing.content" allowedRoles={['management', 'pic']}><ContentPlanPage /></ProtectedRoute>} />
 
       {/* Settings (admin & management) */}
-      <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin', 'management']}><SettingsPage /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute menuKey="settings.appearance" allowedRoles={['admin', 'management']}><SettingsPage /></ProtectedRoute>} />
 
       {/* Legacy redirects */}
       <Route path="/financial-report" element={<Navigate to="/daily-report" replace />} />
