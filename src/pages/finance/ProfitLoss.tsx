@@ -246,6 +246,33 @@ export default function ProfitLossPage() {
     [filteredGroups, pendingChanges],
   );
 
+  const buildUnassignedCsvRows = (groups: ReportGroup[]) =>
+    groups.flatMap((g) =>
+      g.expenses
+        .filter((row) => !isRowAssigned(row))
+        .map((row) => ({
+          id: row.id,
+          tanggal: g.report_date,
+          outlet: g.outlet_name,
+          deskripsi: row.description,
+          qty: row.qty,
+          unit_price: row.unit_price,
+          subtotal: row.amount,
+          category: '',
+        })),
+    );
+
+  const unassignedCsvColumns = [
+    { header: 'id', accessor: (r: any) => r.id },
+    { header: 'tanggal', accessor: (r: any) => r.tanggal },
+    { header: 'outlet', accessor: (r: any) => r.outlet },
+    { header: 'deskripsi', accessor: (r: any) => r.deskripsi },
+    { header: 'qty', accessor: (r: any) => r.qty },
+    { header: 'unit_price', accessor: (r: any) => r.unit_price },
+    { header: 'subtotal', accessor: (r: any) => r.subtotal },
+    { header: 'category', accessor: (r: any) => r.category },
+  ];
+
   const handleExportUnassignedCsv = () => {
     if (unassignedExpenseRows.length === 0) {
       toast({ title: 'Tidak ada item Belum Diassign' });
@@ -257,30 +284,30 @@ export default function ProfitLossPage() {
         : (outlets.find((o) => o.id === inputOutletFilter)?.name || 'outlet').replace(/\s+/g, '-').toLowerCase();
     exportToCSV(
       `belum-diassign-${outletPart}-${month}.csv`,
-      [
-        { header: 'id', accessor: (r: any) => r.id },
-        { header: 'tanggal', accessor: (r: any) => r.tanggal },
-        { header: 'outlet', accessor: (r: any) => r.outlet },
-        { header: 'deskripsi', accessor: (r: any) => r.deskripsi },
-        { header: 'qty', accessor: (r: any) => r.qty },
-        { header: 'unit_price', accessor: (r: any) => r.unit_price },
-        { header: 'subtotal', accessor: (r: any) => r.subtotal },
-        { header: 'category', accessor: (r: any) => r.category },
-      ],
-      unassignedExpenseRows.map(({ row, group }) => ({
-        id: row.id,
-        tanggal: group.report_date,
-        outlet: group.outlet_name,
-        deskripsi: row.description,
-        qty: row.qty,
-        unit_price: row.unit_price,
-        subtotal: row.amount,
-        category: '',
-      })),
+      unassignedCsvColumns,
+      buildUnassignedCsvRows(filteredGroups),
     );
     toast({
       title: `${unassignedExpenseRows.length} item diunduh`,
       description: "Isi kolom 'category' dengan nama akun L/R, lalu import balik.",
+    });
+  };
+
+  const handleExportGroupUnassigned = (g: ReportGroup) => {
+    const rows = buildUnassignedCsvRows([g]);
+    if (rows.length === 0) {
+      toast({ title: 'Tidak ada item Belum Diassign di laporan ini' });
+      return;
+    }
+    const outletPart = (g.outlet_name || 'outlet').replace(/\s+/g, '-').toLowerCase();
+    exportToCSV(
+      `belum-diassign-${outletPart}-${g.report_date}.csv`,
+      unassignedCsvColumns,
+      rows,
+    );
+    toast({
+      title: `${rows.length} item diunduh`,
+      description: `${g.outlet_name} · ${g.report_date}. Isi kolom 'category', lalu import balik.`,
     });
   };
 
