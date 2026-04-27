@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
-import { useEffect } from 'react';
+import { useEffect, forwardRef } from 'react';
 
 export interface ExpenseRow {
   id: string;
