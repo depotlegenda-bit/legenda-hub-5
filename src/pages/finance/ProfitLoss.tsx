@@ -471,16 +471,6 @@ export default function ProfitLossPage() {
             <div className="flex flex-wrap justify-end gap-2 items-center">
               {canBulkAssign && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExportUnassignedCsv}
-                    disabled={unassignedExpenseRows.length === 0}
-                    title="Export CSV item Belum Diassign untuk diisi di Excel"
-                  >
-                    <Download className="w-4 h-4 mr-1" />
-                    Export Belum Diassign ({unassignedExpenseRows.length})
-                  </Button>
                   <CsvImportButton<{ id: string; category: string }>
                     entityLabel="Assign Kategori"
                     templateFilename="belum-diassign-template"
