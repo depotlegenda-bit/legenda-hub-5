@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ChevronDown, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { useEffect } from 'react';
@@ -46,6 +46,10 @@ interface Props {
   onCategoryChange: (id: string, category: string) => void;
   formatRp: (v: number) => string;
   defaultOpen?: boolean;
+  /** When provided, renders an "Export CSV" button per laporan in the group header. */
+  onExportGroup?: (group: ReportGroup) => void;
+  /** Tooltip / aria-label for the per-group export button. */
+  exportGroupLabel?: string;
 }
 
 export default function ReportSection({
@@ -59,6 +63,8 @@ export default function ReportSection({
   onCategoryChange,
   formatRp,
   defaultOpen,
+  onExportGroup,
+  exportGroupLabel = 'Export CSV laporan ini',
 }: Props) {
   // Auto-open the first group in this section on mount if defaultOpen
   useEffect(() => {
@@ -104,9 +110,16 @@ export default function ReportSection({
           return (
             <Collapsible key={g.report_id} open={isOpen} onOpenChange={() => toggleGroup(g.report_id)}>
               <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between px-5 py-3 bg-foreground hover:bg-foreground/90 text-background transition-colors text-left"
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleGroup(g.report_id);
+                    }
+                  }}
+                  className="w-full flex items-center justify-between px-5 py-3 bg-foreground hover:bg-foreground/90 text-background transition-colors text-left cursor-pointer select-none"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {isOpen ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
@@ -121,8 +134,24 @@ export default function ReportSection({
                       </Badge>
                     )}
                     <span className="text-sm font-semibold">{formatRp(total)}</span>
+                    {onExportGroup && g.expenses.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 px-2 ml-1"
+                        title={exportGroupLabel}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onExportGroup(g);
+                        }}
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1" />
+                        CSV
+                      </Button>
+                    )}
                   </div>
-                </button>
+                </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="px-2 py-2 bg-background">
