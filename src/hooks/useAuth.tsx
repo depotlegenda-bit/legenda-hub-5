@@ -67,19 +67,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setLoading(true);
+      (event, session) => {
+        // Update session/user sinkron — JANGAN set loading untuk TOKEN_REFRESHED / USER_UPDATED
+        // agar tidak memicu flash "Memuat..." dan remount route saat token diperbarui.
         setSession(session);
         setUser(session?.user ?? null);
-        if (session?.user) {
+
+        if (event === 'SIGNED_OUT' || !session?.user) {
+          setRole(null);
+          setLoading(false);
+          return;
+        }
+
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          setLoading(true);
           setTimeout(async () => {
             await fetchRole(session.user.id);
             setLoading(false);
           }, 0);
-        } else {
-          setRole(null);
-          setLoading(false);
         }
+        // TOKEN_REFRESHED / USER_UPDATED: biarkan role lama tetap, tidak loading.
       }
     );
 
