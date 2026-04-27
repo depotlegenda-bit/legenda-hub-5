@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ChevronDown, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { useEffect } from 'react';
