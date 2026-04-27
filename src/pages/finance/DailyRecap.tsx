@@ -736,6 +736,46 @@ export default function DailyRecapPage() {
               className="mb-4"
             />
 
+            <div className="flex justify-end mb-3">
+              <ExportButtons
+                filename={`laporan-harian-finance-${activeOutletName || 'semua'}-${format(new Date(), 'yyyy-MM-dd')}`}
+                title={`Laporan Harian Finance — ${activeOutletName || 'Semua Cabang'}`}
+                subtitle={`${reports.length} laporan`}
+                orientation="landscape"
+                columns={[
+                  { header: 'Tanggal', accessor: 'report_date' as any },
+                  { header: 'Pelapor', accessor: 'reporter_name' as any },
+                  { header: 'Pengeluaran Cash', accessor: 'cash_expense' as any },
+                  { header: 'Pengeluaran Transfer', accessor: 'transfer_expense' as any },
+                  { header: 'Total Pengeluaran', accessor: 'total_expense' as any },
+                  { header: 'Selisih', accessor: 'selisih' as any },
+                  { header: 'Catatan', accessor: 'notes' as any },
+                ]}
+                rows={reports.map((r: any) => {
+                  const items = (r.finance_expense_items || []) as any[];
+                  const tCash = items.filter((i) => i.payment_type === 'cash').reduce((s, i) => s + Number(i.subtotal || 0), 0);
+                  const tTransfer = items.filter((i) => i.payment_type === 'transfer').reduce((s, i) => s + Number(i.subtotal || 0), 0);
+                  const tTotal = tCash + tTransfer;
+                  const extra = (r.extra_fields || {}) as Record<string, number>;
+                  const rowSelisih = evalSelisih(activeConfig.selisih_formula, {
+                    ...extra,
+                    total_expense: tTotal,
+                    total_cash_expense: tCash,
+                    total_transfer_expense: tTransfer,
+                  });
+                  return {
+                    report_date: r.report_date,
+                    reporter_name: r.reporter_name || '',
+                    cash_expense: formatRpExport(tCash),
+                    transfer_expense: formatRpExport(tTransfer),
+                    total_expense: formatRpExport(tTotal),
+                    selisih: formatRpExport(rowSelisih),
+                    notes: r.notes || '',
+                  };
+                })}
+              />
+            </div>
+
             <Card className="glass-card">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
