@@ -8,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, MapPin, Clock, RefreshCw, LogIn, LogOut, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Camera, MapPin, Clock, RefreshCw, LogIn, LogOut, AlertTriangle, CheckCircle2, ExternalLink, Building2 } from 'lucide-react';
 
 interface ProfileLite {
   full_name: string;
@@ -17,6 +18,14 @@ interface ProfileLite {
   outlet_lat?: number | null;
   outlet_lng?: number | null;
   outlet_radius?: number | null;
+}
+
+interface OutletOption {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  radius_meters: number | null;
 }
 
 interface RecentLog {
@@ -38,7 +47,7 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export default function CheckInPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -53,12 +62,28 @@ export default function CheckInPage() {
   const [logType, setLogType] = useState<'check_in' | 'check_out'>('check_in');
   const [notes, setNotes] = useState('');
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
+  const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
+  const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
+
+  const canChooseOutlet = role === 'admin' || role === 'management';
 
   // Realtime clock
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Load all outlets for admin/management
+  useEffect(() => {
+    if (!canChooseOutlet) return;
+    (async () => {
+      const { data } = await supabase
+        .from('outlets')
+        .select('id, name, latitude, longitude, radius_meters')
+        .order('name');
+      if (data) setAllOutlets(data as OutletOption[]);
+    })();
+  }, [canChooseOutlet]);
 
   // Load profile + outlet info
   useEffect(() => {
@@ -80,6 +105,8 @@ export default function CheckInPage() {
         if (o) outletData = { outlet_name: o.name, outlet_lat: o.latitude, outlet_lng: o.longitude, outlet_radius: o.radius_meters };
       }
       setProfile({ full_name: prof.full_name, outlet_id: prof.outlet_id, ...outletData });
+      // Default selected outlet to profile outlet if any
+      if (prof.outlet_id) setSelectedOutletId(prof.outlet_id);
     })();
   }, [user]);
 
@@ -175,17 +202,34 @@ export default function CheckInPage() {
     startCamera();
   };
 
+  // Resolve effective outlet (admin/management uses selected; others use profile)
+  const effectiveOutlet = canChooseOutlet
+    ? allOutlets.find((o) => o.id === selectedOutletId) || null
+    : profile?.outlet_id
+      ? {
+          id: profile.outlet_id,
+          name: profile.outlet_name || '',
+          latitude: profile.outlet_lat ?? null,
+          longitude: profile.outlet_lng ?? null,
+          radius_meters: profile.outlet_radius ?? null,
+        }
+      : null;
+
   // Compute distance + warning
   const distance =
-    coords && profile?.outlet_lat != null && profile?.outlet_lng != null
-      ? haversine(coords.coords.latitude, coords.coords.longitude, Number(profile.outlet_lat), Number(profile.outlet_lng))
+    coords && effectiveOutlet?.latitude != null && effectiveOutlet?.longitude != null
+      ? haversine(coords.coords.latitude, coords.coords.longitude, Number(effectiveOutlet.latitude), Number(effectiveOutlet.longitude))
       : null;
-  const radius = profile?.outlet_radius ?? 100;
+  const radius = effectiveOutlet?.radius_meters ?? 100;
   const outOfRadius = distance != null && distance > radius;
 
   const handleSubmit = async () => {
     if (!user || !photoBlob || !coords) {
       toast({ title: 'Data belum lengkap', description: 'Pastikan foto dan lokasi GPS sudah terdeteksi.', variant: 'destructive' });
+      return;
+    }
+    if (canChooseOutlet && !selectedOutletId) {
+      toast({ title: 'Pilih outlet dulu', description: 'Sebagai admin/management, pilih cabang tempat absen.', variant: 'destructive' });
       return;
     }
     setSubmitting(true);
@@ -200,7 +244,7 @@ export default function CheckInPage() {
 
       const { error: insErr } = await supabase.from('attendance_logs').insert({
         user_id: user.id,
-        outlet_id: profile?.outlet_id || null,
+        outlet_id: effectiveOutlet?.id || null,
         log_type: logType,
         selfie_url: publicUrl,
         latitude: coords.coords.latitude,
@@ -246,7 +290,9 @@ export default function CheckInPage() {
             <div>
               <p className="text-xs text-muted-foreground">Karyawan</p>
               <p className="font-semibold">{profile?.full_name || '...'}</p>
-              <p className="text-xs text-muted-foreground mt-1">{profile?.outlet_name || 'Outlet belum diset'}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {effectiveOutlet?.name || profile?.outlet_name || 'Outlet belum diset'}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Waktu</p>
@@ -272,6 +318,30 @@ export default function CheckInPage() {
           </CardContent>
         </Card>
 
+        {/* Outlet selector for admin/management */}
+        {canChooseOutlet && (
+          <Card className="glass-card border-primary/30">
+            <CardContent className="p-4 space-y-2">
+              <Label className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" /> Pilih Cabang Tempat Absen
+              </Label>
+              <Select value={selectedOutletId || ''} onValueChange={(v) => setSelectedOutletId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih outlet..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allOutlets.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Sebagai {role}, Anda dapat absen di cabang manapun. Validasi radius tetap berlaku per outlet yang dipilih.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Distance warning */}
         {distance != null && (
           <Card className={outOfRadius ? 'border-destructive bg-destructive/5' : 'border-emerald-500/40 bg-emerald-500/5'}>
@@ -286,7 +356,7 @@ export default function CheckInPage() {
                   {outOfRadius ? 'Anda di luar radius outlet' : 'Anda dalam radius outlet'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Jarak dari {profile?.outlet_name}: <strong>{Math.round(distance)}m</strong> (radius diizinkan: {radius}m)
+                  Jarak dari {effectiveOutlet?.name || 'outlet'}: <strong>{Math.round(distance)}m</strong> (radius diizinkan: {radius}m)
                   {outOfRadius && ' — absen tetap diterima dengan flag untuk review.'}
                 </p>
               </div>
