@@ -524,6 +524,8 @@ export default function ProfitLossPage() {
               onCategoryChange={handleCategoryChange}
               formatRp={formatRp}
               defaultOpen
+              onExportGroup={canBulkAssign ? handleExportGroupUnassigned : undefined}
+              exportGroupLabel="Export CSV item Belum Diassign untuk laporan ini"
             />
 
             {/* Section: Akun Terisi */}
