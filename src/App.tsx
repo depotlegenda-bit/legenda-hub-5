@@ -7,6 +7,7 @@ import { AuthProvider, useAuth, AppRole } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { AppSettingsProvider } from "@/hooks/useAppSettings";
 import { ViewModeProvider } from "@/hooks/useViewMode";
+import { useMenuPermissions } from "@/hooks/useMenuPermissions";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -46,12 +47,29 @@ import ContentPlanPage from "./pages/marketing/ContentPlan";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: AppRole[] }) {
+function ProtectedRoute({
+  children,
+  allowedRoles,
+  menuKey,
+}: {
+  children: React.ReactNode;
+  allowedRoles?: AppRole[];
+  /** When set, access is checked against role_menu_permissions (admin-configurable). */
+  menuKey?: string;
+}) {
   const { user, role, loading } = useAuth();
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Memuat...</div>;
+  const { isEnabled, loading: permsLoading } = useMenuPermissions();
+  if (loading || (menuKey && permsLoading))
+    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Memuat...</div>;
   if (!user) return <Navigate to="/login" replace />;
   // Admin selalu boleh akses semua route
   if (role === 'admin') return <>{children}</>;
+  // Source of truth: DB-configured menu permissions (when menuKey provided)
+  if (menuKey && role) {
+    if (!isEnabled(role, menuKey)) return <Navigate to="/profile" replace />;
+    return <>{children}</>;
+  }
+  // Fallback: legacy hardcoded allowedRoles
   if (allowedRoles && role && !allowedRoles.includes(role)) return <Navigate to="/profile" replace />;
   return <>{children}</>;
 }
