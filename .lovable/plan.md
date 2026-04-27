@@ -1,57 +1,103 @@
 ## Tujuan
-Menambahkan tombol **Edit** pada tab **Rekap Laporan** di submenu **Laporan Harian Finance** (`/finance/daily-recap?tab=recap`) yang **hanya muncul untuk role `admin`**, sehingga admin bisa memperbarui laporan harian yang sudah disimpan tanpa harus menghapus & input ulang.
+Memudahkan input & dokumentasi data finance dengan menambahkan:
+- **Export CSV + PDF** di Laporan Harian Finance (Daily Recap) dan Laporan Laba Rugi (Profit Loss).
+- **Import CSV** di Daily Recap untuk bulk-input rincian pengeluaran (Profit Loss tidak butuh import karena datanya berasal dari kategorisasi expense yang sudah ada).
+- **Akses bulk-import dibatasi** ke role `admin` dan `management` saja.
 
-## Lokasi & Konteks
-- File utama: `src/pages/finance/DailyRecap.tsx`
-- Tabel terkait: `finance_daily_reports` (header) + `finance_expense_items` (rincian pengeluaran)
-- RLS sudah mendukung: kebijakan `Admin full access finance_daily_reports` dan `Admin full access finance_expense_items` (lewat `is_admin()`) → admin bisa UPDATE/DELETE/INSERT tanpa perlu migrasi tambahan.
-- Saat ini admin hanya melihat tombol **Hapus** (ikon `Trash2`) di kolom paling kanan tabel rekap (baris ~711-717). Kolom Edit belum ada.
+Komponen reusable `ExportButtons` dan `CsvImportButton` sudah ada — tinggal dirangkai. Tidak ada perubahan skema database.
 
-## Perubahan UI
-1. **Kolom aksi tambahan untuk admin** di tabel rekap:
-   - Tambah satu kolom header kosong khusus admin (di samping kolom hapus) untuk tombol Edit (ikon `Pencil` dari `lucide-react`).
-   - Sesuaikan `colSpan` pada baris expanded & baris kosong "Belum ada laporan…" menjadi `8` saat `role === 'admin'` (sebelumnya `7`).
-   - Tombol Edit di-`stopPropagation` agar tidak ikut meng-expand baris.
+---
 
-2. **Dialog Edit Laporan** (komponen baru lokal di file yang sama, atau sub-komponen `EditReportDialog`):
-   - Menggunakan `Dialog` dari `@/components/ui/dialog` dengan ukuran `max-w-3xl`, scrollable.
-   - Isi form sama persis dengan form input (re-use struktur), berisi:
-     - Tanggal laporan (`report_date`)
-     - Nama pelapor (`reporter_name`)
-     - Semua **income fields** dinamis sesuai `activeConfig.income_fields` + `pair_groups` (pakai `MoneyInput`).
-     - Catatan (`notes`)
-     - Daftar **expense items** dengan tab `cash` / `transfer` (mirip form input: item_name, unit_price, qty, tombol hapus, tombol tambah baris).
-   - Footer: tombol **Batal** dan **Simpan Perubahan** (loading state saat submitting).
+## 1. Laporan Harian Finance — `src/pages/finance/DailyRecap.tsx`
 
-3. **Pre-fill data** saat dialog dibuka:
-   - `reportDate`, `reporterName`, `notes` dari row laporan.
-   - `incomeValues` dari kolom `extra_fields` (jsonb) — di-merge dengan `createIncomeValuesFromConfig(activeConfig)` agar field yang baru ditambahkan di config tetap muncul dengan nilai 0.
-   - `lines` dari array `finance_expense_items` (sudah ada di `r.finance_expense_items` karena query `select('*, finance_expense_items(*)')`). Map ke struktur `ExpenseLine` lokal (`id`, `payment_type`, `item_name`, `unit_price`, `qty`).
+### A. Export CSV + PDF (Tab Rekap)
+Tambahkan `<ExportButtons>` di header Tab Rekap (di atas tabel daftar laporan), sumber data = `reports` yang sudah difilter periode/outlet aktif.
 
-## Logika Penyimpanan (handleUpdate)
-Fungsi baru `handleUpdate(reportId)` yang:
-1. **UPDATE header** `finance_daily_reports` (kolom: `report_date`, `reporter_name`, `starting_cash`, `cash_on_hand_added`, `notes`, `extra_fields`) berdasarkan `id`.
-2. **DELETE** semua `finance_expense_items` lama dengan `report_id = reportId`.
-3. **INSERT** ulang `finance_expense_items` dari state dialog (filter baris kosong: `item_name.trim() !== '' || unit_price > 0`, dengan `subtotal = unit_price * qty`).
-4. Jika langkah 2/3 gagal, tampilkan toast error (header sudah terupdate; tidak rollback karena risk minimal — alternatif ditandai di bawah).
-5. Toast sukses → tutup dialog → `fetchReports()` untuk refresh tabel.
+**Kolom export (1 baris per laporan):**
+- Tanggal (`report_date`)
+- Outlet (resolved dari `outlets` lookup)
+- Reporter (`reporter_name`)
+- Pengeluaran Cash (sum `finance_expense_items` payment_type=cash)
+- Pengeluaran Transfer (sum payment_type=transfer)
+- Total Pengeluaran
+- Selisih (hasil `evalSelisih(activeConfig.selisih_formula, …)`)
+- Catatan (`notes`)
+- Filename: `laporan-harian-finance-{outlet}-{periode}`
+- Orientation PDF: `landscape`
 
-> **Catatan strategi delete+insert items**: paling sederhana & konsisten dengan struktur tabel saat ini (tidak ada FK action). Lebih aman dibanding diff per-item. Aman untuk admin karena RLS `is_admin()` mengizinkan DELETE.
+**Tambahan (opsional dalam PDF):** Section kedua berisi rincian item pengeluaran semua laporan dalam periode (tanggal · payment_type · nama · qty · unit_price · subtotal) supaya PDF bisa jadi arsip lengkap.
 
-## Pembatasan Akses
-- Tombol Edit & dialog hanya di-render saat `role === 'admin'` (mengikuti pola tombol Hapus yang sudah ada).
-- Tidak ada perubahan untuk role lain (PIC/management tetap hanya bisa lihat di rekap).
+### B. Import CSV (Tab Input — hanya Admin & Management)
+Tombol `<CsvImportButton>` muncul di samping tombol "Simpan Laporan" di tab Input, hanya jika `role === 'admin' || role === 'management'`.
 
-## Persistensi Draft
-- Tidak menyentuh logika `usePersistentDraft` untuk form **Input Laporan**. Edit dialog menggunakan **state lokal terpisah** (di-mount on demand), sehingga draft input baru yang sedang diketik user **tidak terganggu**.
+**Cakupan import:** Bulk-load **rincian pengeluaran** ke form yang sedang aktif (outlet & tanggal yang dipilih user). Setelah import, semua baris masuk ke state `lines` dan user tetap perlu klik "Simpan Laporan" — ini lebih aman daripada langsung insert ke DB karena:
+- User bisa review hasil parse sebelum commit
+- Tetap pakai 1 alur simpan (header report + items) yang sudah ada
+- Mendukung outlet & tanggal yang sudah dipilih user
 
-## Tidak Ada Perubahan Database
-- Tidak ada migrasi baru. RLS sudah memadai untuk admin (`is_admin()` ALL command pada kedua tabel).
+**Header CSV template:**
+```
+payment_type,item_name,unit_price,qty,category
+cash,Bawang Merah,15000,2,Bahan Baku
+transfer,Bayar Listrik,250000,1,Utilitas
+```
 
-## File Yang Akan Diedit
-- `src/pages/finance/DailyRecap.tsx` (tambah ikon `Pencil`, kolom Edit, sub-komponen dialog, fungsi `handleUpdate`).
+**Validasi `parseRow`:**
+- `payment_type` wajib `cash` atau `transfer` (case-insensitive)
+- `item_name` wajib non-empty
+- `unit_price` & `qty` numeric ≥ 0
+- `category` opsional (default `Lain-lain`)
 
-## Verifikasi Setelah Implementasi
-- Login sebagai admin → buka `/finance/daily-recap?tab=recap` → klik Edit pada salah satu baris → ubah nominal & rincian pengeluaran → simpan → tabel rekap ter-update sesuai (selisih ikut dihitung ulang dari `extra_fields` baru).
-- Login sebagai role lain (pic/management/staff) → tombol Edit **tidak muncul**.
-- Refresh halaman setelah edit → data persist (sudah di DB, bukan draft).
+**`onImport`:** Tidak insert ke DB. Append ke state `lines` lalu return `{success, failed: 0}`. Toast: *"X baris pengeluaran ditambahkan ke form. Klik Simpan untuk menyimpan."*
+
+### C. Import CSV untuk Pendapatan (opsional, sebagai tombol kedua)
+Tombol kedua "Import Pendapatan CSV" yang mengisi `incomeValues` (field-field income dari `activeConfig.income_fields`).
+
+**Header CSV** auto-generated dari config aktif outlet:
+```
+field_key,amount
+cash_start,500000
+cash_added,200000
+penjualan_offline,2500000
+```
+
+Validasi: `field_key` harus ada di `activeConfig.income_fields` atau pair_groups; `amount` numeric (boleh negatif sesuai pengaturan MoneyInput).
+
+→ Akan saya tanyakan saat implementasi jika ternyata tidak diperlukan; default-nya **disertakan** karena melengkapi alur input.
+
+---
+
+## 2. Laporan Laba Rugi — `src/pages/finance/ProfitLoss.tsx`
+File ini **sudah punya** `<ExportButtons>` (CSV + PDF) di header — sudah selesai. Yang perlu ditingkatkan:
+
+### A. Perbaikan Export
+- Saat ini export hanya berisi rekap kategori. Tambahkan opsi export "Detail" yang berisi semua expense items dalam periode (tanggal · outlet · kategori · deskripsi · qty · unit_price · amount) supaya bisa dipakai untuk audit.
+- Implementasi: jadikan dua tombol terpisah — **Export Rekap** (existing) dan **Export Detail** (baru), keduanya CSV + PDF.
+
+### B. Tidak ada Import CSV di Profit Loss
+Alasan: data Profit Loss adalah hasil **kategorisasi** dari `expense_items` (tabel `financial_reports`) yang sudah diinput di halaman lain. Import CSV di sini akan menduplikasi data. Bila user butuh bulk-input, jalurnya lewat Daily Recap (point 1B) atau halaman Financial Report.
+
+→ Akan saya konfirmasi ulang jika ternyata user mau import langsung kategori/akun L/R; secara default **tidak ditambahkan**.
+
+---
+
+## 3. Hak Akses
+- Tombol Export CSV/PDF: tampil untuk **semua role** yang bisa membuka halaman tersebut (export = read-only, aman).
+- Tombol Import CSV (Daily Recap): **hanya tampil** jika `role === 'admin' || role === 'management'`. Cek role pakai `useAuth()` yang sudah ada di file.
+
+---
+
+## 4. File yang akan diubah
+- `src/pages/finance/DailyRecap.tsx` — tambah ExportButtons (rekap) + CsvImportButton (input, role-gated) + helper untuk konversi data ke kolom export.
+- `src/pages/finance/ProfitLoss.tsx` — tambah tombol Export Detail (CSV + PDF) di samping Export Rekap yang sudah ada.
+
+## 5. Tidak diubah
+- Skema database (tidak ada migration).
+- Komponen `ExportButtons.tsx`, `CsvImportButton.tsx`, `exportUtils.ts`, `csvImport.ts` (sudah generic, dipakai apa adanya).
+- RLS — semua operasi tetap lewat alur insert biasa yang sudah dilindungi RLS yang ada.
+
+## 6. Testing manual setelah implementasi
+1. Login sebagai admin → buka Daily Recap → klik Export CSV/PDF di tab Rekap → file ter-download dengan kolom benar.
+2. Di tab Input, klik "Template CSV" → isi → "Import CSV" → preview muncul → konfirmasi → baris pengeluaran ter-load ke form → klik Simpan → tersimpan ke DB.
+3. Login sebagai PIC → tombol Import **tidak muncul** di Daily Recap; tombol Export tetap muncul.
+4. Profit Loss → Export Rekap dan Export Detail menghasilkan dua file berbeda.
