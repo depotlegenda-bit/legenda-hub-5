@@ -1,103 +1,120 @@
 ## Tujuan
-Memudahkan input & dokumentasi data finance dengan menambahkan:
-- **Export CSV + PDF** di Laporan Harian Finance (Daily Recap) dan Laporan Laba Rugi (Profit Loss).
-- **Import CSV** di Daily Recap untuk bulk-input rincian pengeluaran (Profit Loss tidak butuh import karena datanya berasal dari kategorisasi expense yang sudah ada).
-- **Akses bulk-import dibatasi** ke role `admin` dan `management` saja.
 
-Komponen reusable `ExportButtons` dan `CsvImportButton` sudah ada — tinggal dirangkai. Tidak ada perubahan skema database.
+Memudahkan pengisian **akun L/R** di halaman Laporan Laba Rugi (`/finance/profit-loss`) untuk item pengeluaran yang masih **"Belum Diassign"**, lewat alur:
 
----
+1. **Export CSV** semua item Belum Diassign pada periode/outlet aktif
+2. User isi kolom `category` di Excel/Google Sheets
+3. **Import CSV** untuk update massal kategori ke DB
 
-## 1. Laporan Harian Finance — `src/pages/finance/DailyRecap.tsx`
-
-### A. Export CSV + PDF (Tab Rekap)
-Tambahkan `<ExportButtons>` di header Tab Rekap (di atas tabel daftar laporan), sumber data = `reports` yang sudah difilter periode/outlet aktif.
-
-**Kolom export (1 baris per laporan):**
-- Tanggal (`report_date`)
-- Outlet (resolved dari `outlets` lookup)
-- Reporter (`reporter_name`)
-- Pengeluaran Cash (sum `finance_expense_items` payment_type=cash)
-- Pengeluaran Transfer (sum payment_type=transfer)
-- Total Pengeluaran
-- Selisih (hasil `evalSelisih(activeConfig.selisih_formula, …)`)
-- Catatan (`notes`)
-- Filename: `laporan-harian-finance-{outlet}-{periode}`
-- Orientation PDF: `landscape`
-
-**Tambahan (opsional dalam PDF):** Section kedua berisi rincian item pengeluaran semua laporan dalam periode (tanggal · payment_type · nama · qty · unit_price · subtotal) supaya PDF bisa jadi arsip lengkap.
-
-### B. Import CSV (Tab Input — hanya Admin & Management)
-Tombol `<CsvImportButton>` muncul di samping tombol "Simpan Laporan" di tab Input, hanya jika `role === 'admin' || role === 'management'`.
-
-**Cakupan import:** Bulk-load **rincian pengeluaran** ke form yang sedang aktif (outlet & tanggal yang dipilih user). Setelah import, semua baris masuk ke state `lines` dan user tetap perlu klik "Simpan Laporan" — ini lebih aman daripada langsung insert ke DB karena:
-- User bisa review hasil parse sebelum commit
-- Tetap pakai 1 alur simpan (header report + items) yang sudah ada
-- Mendukung outlet & tanggal yang sudah dipilih user
-
-**Header CSV template:**
-```
-payment_type,item_name,unit_price,qty,category
-cash,Bawang Merah,15000,2,Bahan Baku
-transfer,Bayar Listrik,250000,1,Utilitas
-```
-
-**Validasi `parseRow`:**
-- `payment_type` wajib `cash` atau `transfer` (case-insensitive)
-- `item_name` wajib non-empty
-- `unit_price` & `qty` numeric ≥ 0
-- `category` opsional (default `Lain-lain`)
-
-**`onImport`:** Tidak insert ke DB. Append ke state `lines` lalu return `{success, failed: 0}`. Toast: *"X baris pengeluaran ditambahkan ke form. Klik Simpan untuk menyimpan."*
-
-### C. Import CSV untuk Pendapatan (opsional, sebagai tombol kedua)
-Tombol kedua "Import Pendapatan CSV" yang mengisi `incomeValues` (field-field income dari `activeConfig.income_fields`).
-
-**Header CSV** auto-generated dari config aktif outlet:
-```
-field_key,amount
-cash_start,500000
-cash_added,200000
-penjualan_offline,2500000
-```
-
-Validasi: `field_key` harus ada di `activeConfig.income_fields` atau pair_groups; `amount` numeric (boleh negatif sesuai pengaturan MoneyInput).
-
-→ Akan saya tanyakan saat implementasi jika ternyata tidak diperlukan; default-nya **disertakan** karena melengkapi alur input.
+Tidak menambah item pengeluaran baru — hanya meng-assign kategori untuk item yang sudah ada (input item baru tetap lewat Daily Recap supaya konsisten dengan laporan harian).
 
 ---
 
-## 2. Laporan Laba Rugi — `src/pages/finance/ProfitLoss.tsx`
-File ini **sudah punya** `<ExportButtons>` (CSV + PDF) di header — sudah selesai. Yang perlu ditingkatkan:
+## 1. Perubahan di `src/pages/finance/ProfitLoss.tsx`
 
-### A. Perbaikan Export
-- Saat ini export hanya berisi rekap kategori. Tambahkan opsi export "Detail" yang berisi semua expense items dalam periode (tanggal · outlet · kategori · deskripsi · qty · unit_price · amount) supaya bisa dipakai untuk audit.
-- Implementasi: jadikan dua tombol terpisah — **Export Rekap** (existing) dan **Export Detail** (baru), keduanya CSV + PDF.
+### A. Tombol baru di section "Belum Diassign" (Tab Input Akun)
 
-### B. Tidak ada Import CSV di Profit Loss
-Alasan: data Profit Loss adalah hasil **kategorisasi** dari `expense_items` (tabel `financial_reports`) yang sudah diinput di halaman lain. Import CSV di sini akan menduplikasi data. Bila user butuh bulk-input, jalurnya lewat Daily Recap (point 1B) atau halaman Financial Report.
+Di header section `Belum Diassign` (sekitar baris 370-380), tambahkan **dua tombol** di sebelah kanan judul, **hanya tampil jika** `role === 'admin' || role === 'management'`:
 
-→ Akan saya konfirmasi ulang jika ternyata user mau import langsung kategori/akun L/R; secara default **tidak ditambahkan**.
+- **`📥 Export CSV (untuk diisi)`** — download CSV item Belum Diassign saat ini
+- **`📤 Import Kategori CSV`** — buka dialog upload + preview + commit ke DB
+
+Untuk role lain (PIC), section tetap bisa di-assign manual lewat dropdown seperti sekarang — tidak ada perubahan UX.
+
+### B. Format CSV Export
+
+**Filename:** `belum-diassign-{outlet}-{periode}.csv`
+
+**Kolom (urut):**
+| Kolom | Sumber | Catatan |
+|---|---|---|
+| `id` | `expense.id` | **WAJIB & jangan diubah** — kunci untuk update |
+| `tanggal` | `report_date` | Read-only (info untuk user) |
+| `outlet` | `outlet_name` | Read-only |
+| `deskripsi` | `description` (item_name + tag transfer) | Read-only |
+| `qty` | `qty` | Read-only |
+| `unit_price` | `unit_price` | Read-only (angka) |
+| `subtotal` | `amount` | Read-only (angka) |
+| `category` | kosong | **Kolom yang user isi** |
+
+Tambahkan baris pertama setelah header berisi catatan: `# JANGAN UBAH KOLOM 'id'. Isi kolom 'category' dengan nama akun L/R (lihat sheet/list akun di app).` — atau alternatif: simpan instruksi di filename + toast saja, supaya CSV tetap clean. **Pilihan default:** tidak ada baris instruksi (CSV bersih), instruksi muncul di toast saat download.
+
+### C. Alur Import (komponen `CsvImportButton` reusable)
+
+Pakai komponen `CsvImportButton<TParsed>` yang sudah ada di `src/components/CsvImportButton.tsx`:
+
+- `entityLabel`: `"Assign Kategori"`
+- `headers`: `['id', 'tanggal', 'outlet', 'deskripsi', 'qty', 'unit_price', 'subtotal', 'category']`
+- `templateFilename`: `belum-diassign-template`
+- `helperText`: *"Hanya kolom 'category' yang akan di-update. Item dengan kategori kosong dilewati."*
+
+**`parseRow(row)` validasi:**
+- `id` wajib UUID non-empty
+- `category` wajib non-empty (kalau kosong → row di-skip dengan error "kategori kosong")
+- `category` harus match (case-insensitive) salah satu dari `categories` (akun L/R) yang sudah ada di DB **ATAU** auto-create kategori baru jika belum ada (akan saya konfirmasi default ke validasi ketat — tolak jika tidak match, supaya tidak bikin akun L/R typo)
+
+→ **Default plan:** **validasi ketat**. Jika kategori belum ada, baris masuk ke "invalid" dengan pesan `Akun "X" belum ada. Tambahkan di section "Kategori Akun L/R" dulu.`
+
+**`onImport(rows)` aksi:**
+- Loop tiap row → `supabase.from('finance_expense_items').update({ category: row.category }).eq('id', row.id)`
+- Hitung `success` & `failed` berdasar response error per row
+- Setelah selesai → panggil `fetchData()` supaya tabel refresh
+- Toast: `"X item berhasil di-assign, Y gagal"`
+
+### D. Hak akses (role gate)
+
+```tsx
+const { role } = useAuth();
+const canBulkAssign = role === 'admin' || role === 'management';
+```
+
+Tombol Export/Import hanya render jika `canBulkAssign` true. RLS sudah aman:
+- `Management full access finance_expense_items` (ALL) → bisa update
+- `Admin full access finance_expense_items` (ALL) → bisa update
+- PIC tidak punya UPDATE policy untuk `finance_expense_items` → tombol disembunyikan & secara DB juga akan ditolak
+
+### E. UX tambahan
+
+- Tombol Export disabled jika `unassignedGroups` kosong (toast: "Tidak ada item Belum Diassign")
+- Toast saat download: *"File berisi {N} item. Isi kolom 'category' dengan nama akun L/R, lalu import balik."*
+- Dialog preview (sudah built-in di `CsvImportButton`) menampilkan jumlah valid vs error sebelum commit
 
 ---
 
-## 3. Hak Akses
-- Tombol Export CSV/PDF: tampil untuk **semua role** yang bisa membuka halaman tersebut (export = read-only, aman).
-- Tombol Import CSV (Daily Recap): **hanya tampil** jika `role === 'admin' || role === 'management'`. Cek role pakai `useAuth()` yang sudah ada di file.
+## 2. Tidak ada perubahan database
+
+- Tidak ada migration baru
+- RLS yang ada sudah cukup (Admin & Management bisa UPDATE `finance_expense_items`)
+- Tidak menambah tabel/kolom baru
+- Komponen `CsvImportButton`, `parseCSVtoObjects`, `exportToCSV`, `formatRpExport` semuanya sudah ada — tinggal dirangkai
 
 ---
 
-## 4. File yang akan diubah
-- `src/pages/finance/DailyRecap.tsx` — tambah ExportButtons (rekap) + CsvImportButton (input, role-gated) + helper untuk konversi data ke kolom export.
-- `src/pages/finance/ProfitLoss.tsx` — tambah tombol Export Detail (CSV + PDF) di samping Export Rekap yang sudah ada.
+## 3. File yang akan diubah
 
-## 5. Tidak diubah
-- Skema database (tidak ada migration).
-- Komponen `ExportButtons.tsx`, `CsvImportButton.tsx`, `exportUtils.ts`, `csvImport.ts` (sudah generic, dipakai apa adanya).
-- RLS — semua operasi tetap lewat alur insert biasa yang sudah dilindungi RLS yang ada.
+- `src/pages/finance/ProfitLoss.tsx` — tambah:
+  - Import `CsvImportButton`, `exportToCSV`, `useAuth`
+  - Helper `handleExportUnassigned()` & `handleImportCategories(rows)`
+  - Render dua tombol baru di header section "Belum Diassign" (gated by role)
 
-## 6. Testing manual setelah implementasi
-1. Login sebagai admin → buka Daily Recap → klik Export CSV/PDF di tab Rekap → file ter-download dengan kolom benar.
-2. Di tab Input, klik "Template CSV" → isi → "Import CSV" → preview muncul → konfirmasi → baris pengeluaran ter-load ke form → klik Simpan → tersimpan ke DB.
-3. Login sebagai PIC → tombol Import **tidak muncul** di Daily Recap; tombol Export tetap muncul.
-4. Profit Loss → Export Rekap dan Export Detail menghasilkan dua file berbeda.
+## 4. Yang TIDAK diubah
+
+- Tidak menambah fitur "import item pengeluaran baru" (sengaja, supaya data Profit Loss tetap sinkron dengan Daily Recap)
+- Tidak mengubah tampilan/fungsi section "Sudah Diassign" maupun tab "Laporan L/R"
+- Tidak mengubah RLS policies, schema, atau komponen reusable
+
+---
+
+## 5. Testing manual setelah implementasi
+
+1. Login sebagai **admin** → buka `/finance/profit-loss` → tab "Input Akun" → cek section "Belum Diassign"
+2. Klik **Export CSV (untuk diisi)** → file ter-download dengan kolom `id, tanggal, outlet, deskripsi, qty, unit_price, subtotal, category`
+3. Buka di Excel → isi kolom `category` untuk beberapa baris → save sebagai CSV
+4. Klik **Import Kategori CSV** → upload file → preview muncul (X valid, Y error)
+5. Konfirmasi → loading → toast sukses → tabel refresh → item yang sudah diisi pindah ke section "Sudah Diassign"
+6. Test edge cases:
+   - CSV dengan `category` kosong → masuk ke "invalid" dengan pesan jelas
+   - CSV dengan kategori tidak ada di list akun L/R → masuk ke "invalid"
+   - CSV dengan `id` tidak valid (item sudah dihapus) → update gagal, dihitung sebagai `failed`
+7. Login sebagai **PIC** → tombol Export & Import **tidak muncul**, dropdown manual tetap berfungsi
+8. Login sebagai **management** → tombol muncul & berfungsi sama seperti admin
