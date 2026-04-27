@@ -587,10 +587,57 @@ export default function DailyRecapPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <Button type="button" variant="outline" onClick={addLine} className="w-full sm:w-[220px]">
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
+                        <Button type="button" variant="outline" onClick={addLine} className="w-full sm:w-auto">
                           <Plus className="w-4 h-4 mr-1" /> Tambah Pengeluaran
                         </Button>
+
+                        {(role === 'admin' || role === 'management') && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CsvImportButton<ExpenseLine>
+                              entityLabel="Pengeluaran"
+                              templateFilename="template-pengeluaran-finance"
+                              headers={['payment_type', 'item_name', 'unit_price', 'qty']}
+                              sampleRows={[
+                                ['cash', 'Bawang Merah', 15000, 2],
+                                ['transfer', 'Bayar Listrik', 250000, 1],
+                              ]}
+                              helperText="Import baris pengeluaran ke form. Setelah preview & konfirmasi, Anda tetap perlu klik 'Simpan Laporan'."
+                              parseRow={(raw) => {
+                                const pt = (raw['payment_type'] || '').toLowerCase().trim();
+                                if (pt !== 'cash' && pt !== 'transfer') {
+                                  throw new Error("payment_type harus 'cash' atau 'transfer'");
+                                }
+                                const item_name = (raw['item_name'] || '').trim();
+                                if (!item_name) throw new Error('item_name wajib diisi');
+                                const unit_price = Number(raw['unit_price']);
+                                if (!Number.isFinite(unit_price)) throw new Error('unit_price tidak valid');
+                                const qty = Number(raw['qty']);
+                                if (!Number.isFinite(qty)) throw new Error('qty tidak valid');
+                                return {
+                                  id: crypto.randomUUID(),
+                                  payment_type: pt as PaymentType,
+                                  item_name,
+                                  unit_price,
+                                  qty,
+                                };
+                              }}
+                              onImport={async (rows) => {
+                                setLines((prev) => {
+                                  const filtered = prev.filter(
+                                    (l) => l.item_name.trim() !== '' || l.unit_price > 0 || l.qty > 0,
+                                  );
+                                  return [...filtered, ...rows, newLine(expenseTab)];
+                                });
+                                return {
+                                  success: rows.length,
+                                  failed: 0,
+                                  message: "Klik 'Simpan Laporan' untuk menyimpan ke database.",
+                                };
+                              }}
+                            />
+                          </div>
+                        )}
 
                         <Button onClick={handleSubmit} disabled={submitting || !canManage} className="w-full sm:w-[220px]">
                           <Save className="w-4 h-4 mr-2" /> {submitting ? 'Menyimpan…' : 'Simpan Laporan'}
