@@ -47,7 +47,7 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export default function CheckInPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -62,12 +62,28 @@ export default function CheckInPage() {
   const [logType, setLogType] = useState<'check_in' | 'check_out'>('check_in');
   const [notes, setNotes] = useState('');
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
+  const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
+  const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
+
+  const canChooseOutlet = role === 'admin' || role === 'management';
 
   // Realtime clock
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Load all outlets for admin/management
+  useEffect(() => {
+    if (!canChooseOutlet) return;
+    (async () => {
+      const { data } = await supabase
+        .from('outlets')
+        .select('id, name, latitude, longitude, radius_meters')
+        .order('name');
+      if (data) setAllOutlets(data as OutletOption[]);
+    })();
+  }, [canChooseOutlet]);
 
   // Load profile + outlet info
   useEffect(() => {
@@ -89,6 +105,8 @@ export default function CheckInPage() {
         if (o) outletData = { outlet_name: o.name, outlet_lat: o.latitude, outlet_lng: o.longitude, outlet_radius: o.radius_meters };
       }
       setProfile({ full_name: prof.full_name, outlet_id: prof.outlet_id, ...outletData });
+      // Default selected outlet to profile outlet if any
+      if (prof.outlet_id) setSelectedOutletId(prof.outlet_id);
     })();
   }, [user]);
 
