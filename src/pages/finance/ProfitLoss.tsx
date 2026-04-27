@@ -234,6 +234,83 @@ export default function ProfitLossPage() {
 
   const toggleGroup = (id: string) => setOpenGroups((p) => ({ ...p, [id]: !p[id] }));
 
+  // ===== Bulk Assign Kategori (CSV) =====
+  // Daftar item Belum Diassign pada filter aktif (Input Akun tab)
+  const unassignedExpenseRows = useMemo(
+    () =>
+      filteredGroups.flatMap((g) =>
+        g.expenses
+          .filter((row) => !isRowAssigned(row))
+          .map((row) => ({ row, group: g })),
+      ),
+    [filteredGroups, pendingChanges],
+  );
+
+  const handleExportUnassignedCsv = () => {
+    if (unassignedExpenseRows.length === 0) {
+      toast({ title: 'Tidak ada item Belum Diassign' });
+      return;
+    }
+    const outletPart =
+      inputOutletFilter === 'all'
+        ? 'semua-outlet'
+        : (outlets.find((o) => o.id === inputOutletFilter)?.name || 'outlet').replace(/\s+/g, '-').toLowerCase();
+    exportToCSV(
+      `belum-diassign-${outletPart}-${month}.csv`,
+      [
+        { header: 'id', accessor: (r: any) => r.id },
+        { header: 'tanggal', accessor: (r: any) => r.tanggal },
+        { header: 'outlet', accessor: (r: any) => r.outlet },
+        { header: 'deskripsi', accessor: (r: any) => r.deskripsi },
+        { header: 'qty', accessor: (r: any) => r.qty },
+        { header: 'unit_price', accessor: (r: any) => r.unit_price },
+        { header: 'subtotal', accessor: (r: any) => r.subtotal },
+        { header: 'category', accessor: (r: any) => r.category },
+      ],
+      unassignedExpenseRows.map(({ row, group }) => ({
+        id: row.id,
+        tanggal: group.report_date,
+        outlet: group.outlet_name,
+        deskripsi: row.description,
+        qty: row.qty,
+        unit_price: row.unit_price,
+        subtotal: row.amount,
+        category: '',
+      })),
+    );
+    toast({
+      title: `${unassignedExpenseRows.length} item diunduh`,
+      description: "Isi kolom 'category' dengan nama akun L/R, lalu import balik.",
+    });
+  };
+
+  const handleImportCategories = async (
+    rows: { id: string; category: string }[],
+  ): Promise<{ success: number; failed: number; message?: string }> => {
+    let success = 0;
+    let failed = 0;
+    const failedIds: string[] = [];
+    for (const r of rows) {
+      const { error } = await supabase
+        .from('finance_expense_items')
+        .update({ category: r.category })
+        .eq('id', r.id);
+      if (error) {
+        failed += 1;
+        failedIds.push(r.id);
+      } else {
+        success += 1;
+      }
+    }
+    await fetchData();
+    return {
+      success,
+      failed,
+      message: failed > 0 ? `Gagal update: ${failedIds.slice(0, 3).join(', ')}${failedIds.length > 3 ? '…' : ''}` : undefined,
+    };
+  };
+
+
   const handleExportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
