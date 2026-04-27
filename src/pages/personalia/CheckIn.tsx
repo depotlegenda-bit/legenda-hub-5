@@ -290,7 +290,9 @@ export default function CheckInPage() {
             <div>
               <p className="text-xs text-muted-foreground">Karyawan</p>
               <p className="font-semibold">{profile?.full_name || '...'}</p>
-              <p className="text-xs text-muted-foreground mt-1">{profile?.outlet_name || 'Outlet belum diset'}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {effectiveOutlet?.name || profile?.outlet_name || 'Outlet belum diset'}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Waktu</p>
@@ -315,6 +317,30 @@ export default function CheckInPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Outlet selector for admin/management */}
+        {canChooseOutlet && (
+          <Card className="glass-card border-primary/30">
+            <CardContent className="p-4 space-y-2">
+              <Label className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" /> Pilih Cabang Tempat Absen
+              </Label>
+              <Select value={selectedOutletId || ''} onValueChange={(v) => setSelectedOutletId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih outlet..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allOutlets.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Sebagai {role}, Anda dapat absen di cabang manapun. Validasi radius tetap berlaku per outlet yang dipilih.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Distance warning */}
         {distance != null && (
