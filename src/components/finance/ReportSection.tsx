@@ -46,6 +46,10 @@ interface Props {
   onCategoryChange: (id: string, category: string) => void;
   formatRp: (v: number) => string;
   defaultOpen?: boolean;
+  /** When provided, renders an "Export CSV" button per laporan in the group header. */
+  onExportGroup?: (group: ReportGroup) => void;
+  /** Tooltip / aria-label for the per-group export button. */
+  exportGroupLabel?: string;
 }
 
 export default function ReportSection({
@@ -59,6 +63,8 @@ export default function ReportSection({
   onCategoryChange,
   formatRp,
   defaultOpen,
+  onExportGroup,
+  exportGroupLabel = 'Export CSV laporan ini',
 }: Props) {
   // Auto-open the first group in this section on mount if defaultOpen
   useEffect(() => {
