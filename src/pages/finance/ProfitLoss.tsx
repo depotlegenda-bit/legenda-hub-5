@@ -288,6 +288,32 @@ export default function ProfitLossPage() {
                 { kategori: 'LABA / RUGI BERSIH', jumlah: formatRpExport(netProfit) },
               ]}
             />
+            <ExportButtons
+              filename={`laba-rugi-detail-${month}`}
+              title={`Detail Pengeluaran Laba Rugi - ${month}`}
+              subtitle={`${lrExpenseRows.length} item pengeluaran`}
+              orientation="landscape"
+              columns={[
+                { header: 'Tanggal', accessor: (r: any) => r.tanggal },
+                { header: 'Outlet', accessor: (r: any) => r.outlet },
+                { header: 'Kategori', accessor: (r: any) => r.kategori },
+                { header: 'Deskripsi', accessor: (r: any) => r.deskripsi },
+                { header: 'Qty', accessor: (r: any) => r.qty },
+                { header: 'Harga Satuan', accessor: (r: any) => r.harga },
+                { header: 'Subtotal', accessor: (r: any) => r.subtotal },
+              ]}
+              rows={lrGroups.flatMap((g) =>
+                g.expenses.map((row) => ({
+                  tanggal: g.report_date,
+                  outlet: g.outlet_name,
+                  kategori: pendingChanges[row.id] ?? row.category ?? 'Belum Dikategorikan',
+                  deskripsi: row.description,
+                  qty: row.qty,
+                  harga: formatRpExport(row.unit_price),
+                  subtotal: formatRpExport(row.amount),
+                }))
+              )}
+            />
           </div>
         </div>
 
