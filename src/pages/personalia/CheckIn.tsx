@@ -356,7 +356,7 @@ export default function CheckInPage() {
                   {outOfRadius ? 'Anda di luar radius outlet' : 'Anda dalam radius outlet'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Jarak dari {profile?.outlet_name}: <strong>{Math.round(distance)}m</strong> (radius diizinkan: {radius}m)
+                  Jarak dari {effectiveOutlet?.name || 'outlet'}: <strong>{Math.round(distance)}m</strong> (radius diizinkan: {radius}m)
                   {outOfRadius && ' — absen tetap diterima dengan flag untuk review.'}
                 </p>
               </div>
