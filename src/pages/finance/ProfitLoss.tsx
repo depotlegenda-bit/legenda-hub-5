@@ -20,7 +20,9 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ReportSection from '@/components/finance/ReportSection';
 import { ExportButtons } from '@/components/ExportButtons';
-import { formatRpExport } from '@/lib/exportUtils';
+import { CsvImportButton } from '@/components/CsvImportButton';
+import { exportToCSV, formatRpExport } from '@/lib/exportUtils';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ExpenseRow {
   id: string;
