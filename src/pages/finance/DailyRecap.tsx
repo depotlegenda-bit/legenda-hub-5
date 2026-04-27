@@ -30,6 +30,9 @@ import FinanceStatsRecap from '@/components/finance/FinanceStatsRecap';
 import { useTabParam } from '@/hooks/useTabParam';
 import { MoneyInput } from '@/components/MoneyInput';
 import { usePersistentDraft } from '@/hooks/usePersistentDraft';
+import { ExportButtons } from '@/components/ExportButtons';
+import { CsvImportButton } from '@/components/CsvImportButton';
+import { formatRpExport } from '@/lib/exportUtils';
 
 type PaymentType = 'cash' | 'transfer';
 
@@ -584,10 +587,57 @@ export default function DailyRecapPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <Button type="button" variant="outline" onClick={addLine} className="w-full sm:w-[220px]">
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
+                        <Button type="button" variant="outline" onClick={addLine} className="w-full sm:w-auto">
                           <Plus className="w-4 h-4 mr-1" /> Tambah Pengeluaran
                         </Button>
+
+                        {(role === 'admin' || role === 'management') && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CsvImportButton<ExpenseLine>
+                              entityLabel="Pengeluaran"
+                              templateFilename="template-pengeluaran-finance"
+                              headers={['payment_type', 'item_name', 'unit_price', 'qty']}
+                              sampleRows={[
+                                ['cash', 'Bawang Merah', 15000, 2],
+                                ['transfer', 'Bayar Listrik', 250000, 1],
+                              ]}
+                              helperText="Import baris pengeluaran ke form. Setelah preview & konfirmasi, Anda tetap perlu klik 'Simpan Laporan'."
+                              parseRow={(raw) => {
+                                const pt = (raw['payment_type'] || '').toLowerCase().trim();
+                                if (pt !== 'cash' && pt !== 'transfer') {
+                                  throw new Error("payment_type harus 'cash' atau 'transfer'");
+                                }
+                                const item_name = (raw['item_name'] || '').trim();
+                                if (!item_name) throw new Error('item_name wajib diisi');
+                                const unit_price = Number(raw['unit_price']);
+                                if (!Number.isFinite(unit_price)) throw new Error('unit_price tidak valid');
+                                const qty = Number(raw['qty']);
+                                if (!Number.isFinite(qty)) throw new Error('qty tidak valid');
+                                return {
+                                  id: crypto.randomUUID(),
+                                  payment_type: pt as PaymentType,
+                                  item_name,
+                                  unit_price,
+                                  qty,
+                                };
+                              }}
+                              onImport={async (rows) => {
+                                setLines((prev) => {
+                                  const filtered = prev.filter(
+                                    (l) => l.item_name.trim() !== '' || l.unit_price > 0 || l.qty > 0,
+                                  );
+                                  return [...filtered, ...rows, newLine(expenseTab)];
+                                });
+                                return {
+                                  success: rows.length,
+                                  failed: 0,
+                                  message: "Klik 'Simpan Laporan' untuk menyimpan ke database.",
+                                };
+                              }}
+                            />
+                          </div>
+                        )}
 
                         <Button onClick={handleSubmit} disabled={submitting || !canManage} className="w-full sm:w-[220px]">
                           <Save className="w-4 h-4 mr-2" /> {submitting ? 'Menyimpan…' : 'Simpan Laporan'}
@@ -685,6 +735,46 @@ export default function DailyRecapPage() {
               onChange={setActiveOutlet}
               className="mb-4"
             />
+
+            <div className="flex justify-end mb-3">
+              <ExportButtons
+                filename={`laporan-harian-finance-${activeOutletName || 'semua'}-${format(new Date(), 'yyyy-MM-dd')}`}
+                title={`Laporan Harian Finance — ${activeOutletName || 'Semua Cabang'}`}
+                subtitle={`${reports.length} laporan`}
+                orientation="landscape"
+                columns={[
+                  { header: 'Tanggal', accessor: 'report_date' as any },
+                  { header: 'Pelapor', accessor: 'reporter_name' as any },
+                  { header: 'Pengeluaran Cash', accessor: 'cash_expense' as any },
+                  { header: 'Pengeluaran Transfer', accessor: 'transfer_expense' as any },
+                  { header: 'Total Pengeluaran', accessor: 'total_expense' as any },
+                  { header: 'Selisih', accessor: 'selisih' as any },
+                  { header: 'Catatan', accessor: 'notes' as any },
+                ]}
+                rows={reports.map((r: any) => {
+                  const items = (r.finance_expense_items || []) as any[];
+                  const tCash = items.filter((i) => i.payment_type === 'cash').reduce((s, i) => s + Number(i.subtotal || 0), 0);
+                  const tTransfer = items.filter((i) => i.payment_type === 'transfer').reduce((s, i) => s + Number(i.subtotal || 0), 0);
+                  const tTotal = tCash + tTransfer;
+                  const extra = (r.extra_fields || {}) as Record<string, number>;
+                  const rowSelisih = evalSelisih(activeConfig.selisih_formula, {
+                    ...extra,
+                    total_expense: tTotal,
+                    total_cash_expense: tCash,
+                    total_transfer_expense: tTransfer,
+                  });
+                  return {
+                    report_date: r.report_date,
+                    reporter_name: r.reporter_name || '',
+                    cash_expense: formatRpExport(tCash),
+                    transfer_expense: formatRpExport(tTransfer),
+                    total_expense: formatRpExport(tTotal),
+                    selisih: formatRpExport(rowSelisih),
+                    notes: r.notes || '',
+                  };
+                })}
+              />
+            </div>
 
             <Card className="glass-card">
               <CardContent className="p-0">
