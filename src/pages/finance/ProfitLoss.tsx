@@ -20,7 +20,9 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ReportSection from '@/components/finance/ReportSection';
 import { ExportButtons } from '@/components/ExportButtons';
-import { formatRpExport } from '@/lib/exportUtils';
+import { CsvImportButton } from '@/components/CsvImportButton';
+import { exportToCSV, formatRpExport } from '@/lib/exportUtils';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ExpenseRow {
   id: string;
@@ -50,6 +52,8 @@ interface PLCategory {
 
 export default function ProfitLossPage() {
   const { toast } = useToast();
+  const { role } = useAuth();
+  const canBulkAssign = role === 'admin' || role === 'management';
   const { outlets, selectedOutlet, setSelectedOutlet } = useOutlets();
   const [mainTab, setMainTab] = useTabParam('input');
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -230,6 +234,83 @@ export default function ProfitLossPage() {
 
   const toggleGroup = (id: string) => setOpenGroups((p) => ({ ...p, [id]: !p[id] }));
 
+  // ===== Bulk Assign Kategori (CSV) =====
+  // Daftar item Belum Diassign pada filter aktif (Input Akun tab)
+  const unassignedExpenseRows = useMemo(
+    () =>
+      filteredGroups.flatMap((g) =>
+        g.expenses
+          .filter((row) => !isRowAssigned(row))
+          .map((row) => ({ row, group: g })),
+      ),
+    [filteredGroups, pendingChanges],
+  );
+
+  const handleExportUnassignedCsv = () => {
+    if (unassignedExpenseRows.length === 0) {
+      toast({ title: 'Tidak ada item Belum Diassign' });
+      return;
+    }
+    const outletPart =
+      inputOutletFilter === 'all'
+        ? 'semua-outlet'
+        : (outlets.find((o) => o.id === inputOutletFilter)?.name || 'outlet').replace(/\s+/g, '-').toLowerCase();
+    exportToCSV(
+      `belum-diassign-${outletPart}-${month}.csv`,
+      [
+        { header: 'id', accessor: (r: any) => r.id },
+        { header: 'tanggal', accessor: (r: any) => r.tanggal },
+        { header: 'outlet', accessor: (r: any) => r.outlet },
+        { header: 'deskripsi', accessor: (r: any) => r.deskripsi },
+        { header: 'qty', accessor: (r: any) => r.qty },
+        { header: 'unit_price', accessor: (r: any) => r.unit_price },
+        { header: 'subtotal', accessor: (r: any) => r.subtotal },
+        { header: 'category', accessor: (r: any) => r.category },
+      ],
+      unassignedExpenseRows.map(({ row, group }) => ({
+        id: row.id,
+        tanggal: group.report_date,
+        outlet: group.outlet_name,
+        deskripsi: row.description,
+        qty: row.qty,
+        unit_price: row.unit_price,
+        subtotal: row.amount,
+        category: '',
+      })),
+    );
+    toast({
+      title: `${unassignedExpenseRows.length} item diunduh`,
+      description: "Isi kolom 'category' dengan nama akun L/R, lalu import balik.",
+    });
+  };
+
+  const handleImportCategories = async (
+    rows: { id: string; category: string }[],
+  ): Promise<{ success: number; failed: number; message?: string }> => {
+    let success = 0;
+    let failed = 0;
+    const failedIds: string[] = [];
+    for (const r of rows) {
+      const { error } = await supabase
+        .from('finance_expense_items')
+        .update({ category: r.category })
+        .eq('id', r.id);
+      if (error) {
+        failed += 1;
+        failedIds.push(r.id);
+      } else {
+        success += 1;
+      }
+    }
+    await fetchData();
+    return {
+      success,
+      failed,
+      message: failed > 0 ? `Gagal update: ${failedIds.slice(0, 3).join(', ')}${failedIds.length > 3 ? '…' : ''}` : undefined,
+    };
+  };
+
+
   const handleExportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
@@ -360,7 +441,44 @@ export default function ProfitLossPage() {
               ))}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2 items-center">
+              {canBulkAssign && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportUnassignedCsv}
+                    disabled={unassignedExpenseRows.length === 0}
+                    title="Export CSV item Belum Diassign untuk diisi di Excel"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Export Belum Diassign ({unassignedExpenseRows.length})
+                  </Button>
+                  <CsvImportButton<{ id: string; category: string }>
+                    entityLabel="Assign Kategori"
+                    templateFilename="belum-diassign-template"
+                    headers={['id', 'tanggal', 'outlet', 'deskripsi', 'qty', 'unit_price', 'subtotal', 'category']}
+                    sampleRows={[
+                      ['<id-otomatis-jangan-diubah>', '2025-01-15', 'Outlet A', 'Bawang Merah', 2, 15000, 30000, 'Bahan Baku'],
+                    ]}
+                    helperText="Hanya kolom 'category' yang akan di-update. Baris dengan kategori kosong atau akun yang belum terdaftar akan dilewati."
+                    parseRow={(raw) => {
+                      const id = (raw['id'] || '').trim();
+                      const category = (raw['category'] || '').trim();
+                      if (!id) throw new Error("Kolom 'id' wajib diisi");
+                      if (!category) throw new Error("Kolom 'category' kosong");
+                      const matched = expenseCategories.find(
+                        (c) => c.name.toLowerCase() === category.toLowerCase(),
+                      );
+                      if (!matched) {
+                        throw new Error(`Akun "${category}" belum ada. Tambahkan di "Tambah Akun" dulu.`);
+                      }
+                      return { id, category: matched.name };
+                    }}
+                    onImport={handleImportCategories}
+                  />
+                </>
+              )}
               <Button onClick={handleSaveAll} disabled={saving || Object.keys(pendingChanges).length === 0}>
                 <Save className="w-4 h-4 mr-1" />
                 {saving ? 'Menyimpan...' : `Simpan Perubahan (${Object.keys(pendingChanges).length})`}
