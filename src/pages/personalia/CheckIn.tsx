@@ -202,17 +202,34 @@ export default function CheckInPage() {
     startCamera();
   };
 
+  // Resolve effective outlet (admin/management uses selected; others use profile)
+  const effectiveOutlet = canChooseOutlet
+    ? allOutlets.find((o) => o.id === selectedOutletId) || null
+    : profile?.outlet_id
+      ? {
+          id: profile.outlet_id,
+          name: profile.outlet_name || '',
+          latitude: profile.outlet_lat ?? null,
+          longitude: profile.outlet_lng ?? null,
+          radius_meters: profile.outlet_radius ?? null,
+        }
+      : null;
+
   // Compute distance + warning
   const distance =
-    coords && profile?.outlet_lat != null && profile?.outlet_lng != null
-      ? haversine(coords.coords.latitude, coords.coords.longitude, Number(profile.outlet_lat), Number(profile.outlet_lng))
+    coords && effectiveOutlet?.latitude != null && effectiveOutlet?.longitude != null
+      ? haversine(coords.coords.latitude, coords.coords.longitude, Number(effectiveOutlet.latitude), Number(effectiveOutlet.longitude))
       : null;
-  const radius = profile?.outlet_radius ?? 100;
+  const radius = effectiveOutlet?.radius_meters ?? 100;
   const outOfRadius = distance != null && distance > radius;
 
   const handleSubmit = async () => {
     if (!user || !photoBlob || !coords) {
       toast({ title: 'Data belum lengkap', description: 'Pastikan foto dan lokasi GPS sudah terdeteksi.', variant: 'destructive' });
+      return;
+    }
+    if (canChooseOutlet && !selectedOutletId) {
+      toast({ title: 'Pilih outlet dulu', description: 'Sebagai admin/management, pilih cabang tempat absen.', variant: 'destructive' });
       return;
     }
     setSubmitting(true);
@@ -227,7 +244,7 @@ export default function CheckInPage() {
 
       const { error: insErr } = await supabase.from('attendance_logs').insert({
         user_id: user.id,
-        outlet_id: profile?.outlet_id || null,
+        outlet_id: effectiveOutlet?.id || null,
         log_type: logType,
         selfie_url: publicUrl,
         latitude: coords.coords.latitude,
