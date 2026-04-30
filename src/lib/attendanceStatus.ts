@@ -66,7 +66,11 @@ export function getAttendanceStatus(
   createdAt: string | Date,
   logType: 'check_in' | 'check_out',
   thresholds: AttendanceThresholds = DEFAULT_THRESHOLDS,
+  options?: { exempt?: boolean },
 ): StatusInfo {
+  if (options?.exempt) {
+    return { ...STATUS_LABELS.exempt, key: 'exempt', diffMinutes: 0 };
+  }
   if (!createdAt) {
     return { ...STATUS_LABELS.unknown, key: 'unknown', diffMinutes: 0 };
   }
