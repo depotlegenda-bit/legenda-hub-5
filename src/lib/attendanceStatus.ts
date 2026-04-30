@@ -18,19 +18,18 @@ export const DEFAULT_THRESHOLDS: AttendanceThresholds = {
 };
 
 export type AttendanceStatus =
-  | 'on_time'      // tepat waktu
-  | 'late'         // terlambat
-  | 'early_in'     // datang lebih awal dari ambang toleransi
-  | 'early_out'    // pulang lebih awal
-  | 'overtime'     // pulang setelah batas wajar
+  | 'on_time'
+  | 'late'
+  | 'early_in'
+  | 'early_out'
+  | 'overtime'
+  | 'exempt'       // role bebas dari ambang waktu (admin/management/pic)
   | 'unknown';
 
 export interface StatusInfo {
   key: AttendanceStatus;
   label: string;
-  // Tailwind class untuk badge
   className: string;
-  // Selisih menit dari ambang ideal (positif = setelah ambang, negatif = sebelumnya)
   diffMinutes: number;
 }
 
@@ -40,8 +39,17 @@ const STATUS_LABELS: Record<AttendanceStatus, { label: string; className: string
   early_in: { label: 'Datang Awal',  className: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
   early_out:{ label: 'Pulang Duluan',className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
   overtime: { label: 'Lembur',       className: 'bg-purple-500/15 text-purple-700 dark:text-purple-400' },
+  exempt:   { label: 'Bebas Jam',    className: 'bg-slate-500/15 text-slate-700 dark:text-slate-300' },
   unknown:  { label: '-',            className: 'bg-muted text-muted-foreground' },
 };
+
+// Role yang dikecualikan dari ambang waktu absensi.
+// Tetap di-track jam kedatangannya, tapi tidak diberi label terlambat/duluan/dll.
+export const EXEMPT_ROLES = new Set(['admin', 'management', 'pic']);
+
+export function isRoleExempt(role?: string | null): boolean {
+  return !!role && EXEMPT_ROLES.has(role);
+}
 
 // Ubah 'HH:MM' atau 'HH:MM:SS' jadi total menit sejak 00:00
 function timeToMinutes(t: string): number {
@@ -58,7 +66,11 @@ export function getAttendanceStatus(
   createdAt: string | Date,
   logType: 'check_in' | 'check_out',
   thresholds: AttendanceThresholds = DEFAULT_THRESHOLDS,
+  options?: { exempt?: boolean },
 ): StatusInfo {
+  if (options?.exempt) {
+    return { ...STATUS_LABELS.exempt, key: 'exempt', diffMinutes: 0 };
+  }
   if (!createdAt) {
     return { ...STATUS_LABELS.unknown, key: 'unknown', diffMinutes: 0 };
   }

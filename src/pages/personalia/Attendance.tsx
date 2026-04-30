@@ -17,7 +17,7 @@ import { id as idLocale } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
 import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
-import { getAttendanceStatus, formatDiffMinutes } from '@/lib/attendanceStatus';
+import { getAttendanceStatus, formatDiffMinutes, isRoleExempt } from '@/lib/attendanceStatus';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -701,6 +701,27 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const [userFilter, setUserFilter] = useState<string>('all');
   const [outletFilter, setOutletFilter] = useState<string>('all');
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [rolesByUser, setRolesByUser] = useState<Record<string, string[]>>({});
+
+  // Fetch role per user supaya bisa menentukan siapa yang dikecualikan dari ambang waktu.
+  useEffect(() => {
+    if (allProfiles.length === 0) { setRolesByUser({}); return; }
+    const ids = allProfiles.map((p) => p.user_id);
+    supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .in('user_id', ids)
+      .then(({ data }) => {
+        const map: Record<string, string[]> = {};
+        (data || []).forEach((r: any) => {
+          if (!map[r.user_id]) map[r.user_id] = [];
+          map[r.user_id].push(String(r.role));
+        });
+        setRolesByUser(map);
+      });
+  }, [allProfiles]);
+
+  const isUserExempt = (userId: string) => (rolesByUser[userId] || []).some((r) => isRoleExempt(r));
 
   const visibleProfiles = useMemo(
     () => outletFilter === 'all' ? allProfiles : allProfiles.filter((p) => p.outlet_id === outletFilter),
@@ -736,7 +757,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
-    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id));
+    const exempt = isUserExempt(log.user_id);
+    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id), { exempt });
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
@@ -878,7 +900,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               {filtered.map((log) => {
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
-                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id));
+                const exempt = isUserExempt(log.user_id);
+                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id), { exempt });
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
@@ -901,7 +924,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                         <span className={cn('px-2 py-0.5 rounded text-xs font-medium w-fit', status.className)}>
                           {status.label}
                         </span>
-                        {status.key !== 'unknown' && status.key !== 'on_time' && (
+                        {status.key !== 'unknown' && status.key !== 'on_time' && status.key !== 'exempt' && (
                           <span className="text-[10px] font-mono text-muted-foreground">{formatDiffMinutes(status.diffMinutes)}</span>
                         )}
                       </div>
