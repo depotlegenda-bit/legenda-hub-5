@@ -14,7 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Clock, Save, Store, Trash2, Plus, Layers } from 'lucide-react';
+import { Clock, Save, Store, Trash2, Plus, Layers, Pencil, ListChecks } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
