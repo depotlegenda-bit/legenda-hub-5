@@ -304,15 +304,17 @@ export default function InventoryPage() {
       return;
     }
 
-    const headers = ['Tanggal', 'Cabang', 'Nama Item', 'Stok Awal', 'Masuk', 'Stok Akhir', 'Min Threshold'];
+    const headers = ['Tanggal', 'Cabang', 'Nama Item', 'Stok Awal', 'Masuk', 'Waste', 'Keluar', 'Stok Akhir', 'Min Threshold'];
     const csvRows = [headers.join(',')];
-    data.forEach((row) => {
+    data.forEach((row: any) => {
       csvRows.push([
         row.record_date,
         `"${outletMap.get(row.outlet_id ?? '') || '-'}"`,
         `"${row.item_name}"`,
         row.starting_stock,
         row.incoming_stock,
+        row.waste ?? 0,
+        row.outgoing_stock ?? 0,
         row.ending_stock,
         row.minimum_threshold,
       ].join(','));
