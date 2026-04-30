@@ -175,6 +175,7 @@ export type Database = {
           early_checkin_minutes: number
           id: string
           outlet_id: string | null
+          shift_name: string
           updated_at: string
           updated_by: string | null
         }
@@ -187,6 +188,7 @@ export type Database = {
           early_checkin_minutes?: number
           id?: string
           outlet_id?: string | null
+          shift_name?: string
           updated_at?: string
           updated_by?: string | null
         }
@@ -199,6 +201,7 @@ export type Database = {
           early_checkin_minutes?: number
           id?: string
           outlet_id?: string | null
+          shift_name?: string
           updated_at?: string
           updated_by?: string | null
         }
