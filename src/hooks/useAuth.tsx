@@ -16,6 +16,8 @@ export interface SignUpPayload {
   outlet_id?: string | null;
   join_month?: string;
   join_year?: string;
+  job_title?: string;
+  employment_status?: string;
 }
 
 interface AuthContextType {
@@ -128,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           outlet_id: payload.outlet_id || '',
           join_month: payload.join_month || '',
           join_year: payload.join_year || '',
+          job_title: payload.job_title || 'Crew',
+          employment_status: payload.employment_status || 'Contract',
         },
       },
     });
