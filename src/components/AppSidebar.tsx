@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Menu, ChevronDown, X } from 'lucide-react';
+import { LogOut, Menu, ChevronDown, X, PanelLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
@@ -19,6 +19,14 @@ export default function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('dl-sidebar-collapsed-v1') === '1';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dl-sidebar-collapsed-v1', desktopCollapsed ? '1' : '0');
+  }, [desktopCollapsed]);
 
   // Auto close drawer on route change (mobile)
   useEffect(() => {
