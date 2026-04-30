@@ -120,10 +120,22 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <SettingsIcon className="w-7 h-7 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Pengaturan Tampilan</h1>
-            <p className="text-sm text-muted-foreground">Kustomisasi font, warna, logo, dan elemen visual aplikasi.</p>
+            <h1 className="text-2xl font-bold">Pengaturan</h1>
+            <p className="text-sm text-muted-foreground">Kustomisasi tampilan & atur ambang waktu absensi.</p>
           </div>
         </div>
+
+        <Tabs defaultValue="appearance" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="appearance" className="gap-2">
+              <Palette className="w-4 h-4" /> Tampilan
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="gap-2">
+              <Clock className="w-4 h-4" /> Absensi
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="appearance" className="space-y-6 mt-0">
 
         {/* Typography */}
         <Card>
