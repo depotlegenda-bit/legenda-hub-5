@@ -25,6 +25,7 @@ interface StockRow {
   unit: string;
   starting_stock: string;
   incoming_stock: string;
+  waste: string;
   ending_stock: string;
   minimum_threshold: string;
 }
@@ -34,11 +35,17 @@ interface InventoryRecord {
   item_name: string;
   starting_stock: number;
   incoming_stock: number;
+  waste: number;
+  outgoing_stock: number;
   ending_stock: number;
   minimum_threshold: number;
   record_date: string;
   outlet_id: string | null;
 }
+
+/** Stok keluar = stok awal + masuk − waste − stok akhir (tidak kurang dari 0). */
+const computeOutgoing = (starting: number, incoming: number, waste: number, ending: number) =>
+  Math.max(0, (starting || 0) + (incoming || 0) - (waste || 0) - (ending || 0));
 
 interface OutletMaterial {
   id: string;
