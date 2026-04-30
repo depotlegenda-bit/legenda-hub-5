@@ -20,6 +20,9 @@ const months = [
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 20 }, (_, i) => currentYear - i);
 
+const JOB_TITLES = ['Crew', 'Kasir', 'Barista', 'Cook', 'Server', 'Stockman', 'PIC', 'Supervisor', 'Manager', 'Lainnya'];
+const EMPLOYMENT_STATUSES = ['Contract', 'Probation', 'Permanent', 'Part-Time', 'Magang'];
+
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -32,6 +35,8 @@ export default function Login() {
   const [joinMonth, setJoinMonth] = useState('');
   const [joinYear, setJoinYear] = useState('');
   const [outletId, setOutletId] = useState('');
+  const [jobTitle, setJobTitle] = useState('Crew');
+  const [employmentStatus, setEmploymentStatus] = useState('Contract');
   const [outlets, setOutlets] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
@@ -79,11 +84,20 @@ export default function Login() {
         outlet_id: outletId || null,
         join_month: joinMonth,
         join_year: joinYear,
+        job_title: jobTitle,
+        employment_status: employmentStatus,
       });
       if (error) {
         toast({ title: 'Gagal mendaftar', description: error.message, variant: 'destructive' });
       } else {
-        toast({ title: 'Berhasil!', description: 'Silakan cek email untuk konfirmasi.' });
+        // Email confirmation dimatikan — langsung sign-in agar user masuk dashboard
+        const { error: signInErr } = await signIn(email, password);
+        if (signInErr) {
+          toast({ title: 'Akun berhasil dibuat', description: 'Silakan masuk dengan email & password Anda.' });
+          setIsSignUp(false);
+        } else {
+          toast({ title: 'Selamat datang!', description: 'Akun berhasil dibuat dan Anda otomatis masuk.' });
+        }
       }
     } else {
       const { error } = await signIn(email, password);
