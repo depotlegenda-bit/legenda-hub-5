@@ -707,13 +707,17 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const reload = () => {
     if (visibleProfiles.length === 0) { setLogs([]); return; }
     const userIds = visibleProfiles.map((p) => p.user_id);
-    const start = `${date}T00:00:00`;
-    const end = `${date}T23:59:59`;
+    // Gunakan rentang waktu LOKAL penuh (00:00:00.000 – 23:59:59.999) lalu konversi ke ISO/UTC,
+    // supaya log absensi di jam berapapun (termasuk dini hari & malam) tetap terdeteksi
+    // walau created_at di DB tersimpan dalam UTC.
+    const [y, m, d] = date.split('-').map(Number);
+    const startLocal = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+    const endLocal = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
     supabase
       .from('attendance_logs')
       .select('*')
-      .gte('created_at', start)
-      .lte('created_at', end)
+      .gte('created_at', startLocal.toISOString())
+      .lte('created_at', endLocal.toISOString())
       .in('user_id', userIds)
       .order('created_at', { ascending: false })
       .then(({ data }) => setLogs(data || []));
