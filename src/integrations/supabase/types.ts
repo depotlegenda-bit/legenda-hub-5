@@ -174,6 +174,7 @@ export type Database = {
           created_at: string
           early_checkin_minutes: number
           id: string
+          outlet_id: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -185,6 +186,7 @@ export type Database = {
           created_at?: string
           early_checkin_minutes?: number
           id?: string
+          outlet_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -196,10 +198,19 @@ export type Database = {
           created_at?: string
           early_checkin_minutes?: number
           id?: string
+          outlet_id?: string | null
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "attendance_thresholds_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: false
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cashbon: {
         Row: {
