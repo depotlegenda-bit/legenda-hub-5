@@ -949,7 +949,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={isAdmin ? 8 : 7} className="p-8 text-center text-muted-foreground">Belum ada log absen selfie pada tanggal ini.</td></tr>
+                <tr><td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-muted-foreground">Belum ada log absen selfie pada tanggal ini.</td></tr>
               )}
             </tbody>
           </table>
