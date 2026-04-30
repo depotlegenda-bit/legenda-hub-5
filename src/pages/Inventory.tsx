@@ -343,13 +343,15 @@ export default function InventoryPage() {
     doc.text(`Dicetak: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 28);
     autoTable(doc, {
       startY: 35,
-      head: [['Tanggal', 'Cabang', 'Item', 'Stok Awal', 'Masuk', 'Stok Akhir', 'Threshold']],
-      body: data.map((row) => [
+      head: [['Tanggal', 'Cabang', 'Item', 'Stok Awal', 'Masuk', 'Waste', 'Keluar', 'Stok Akhir', 'Threshold']],
+      body: data.map((row: any) => [
         row.record_date,
         outletMap.get(row.outlet_id ?? '') || '-',
         row.item_name,
         row.starting_stock,
         row.incoming_stock,
+        row.waste ?? 0,
+        row.outgoing_stock ?? 0,
         row.ending_stock,
         row.minimum_threshold,
       ]),
