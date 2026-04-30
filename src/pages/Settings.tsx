@@ -303,6 +303,12 @@ export default function SettingsPage() {
             <RotateCcw className="w-4 h-4 mr-2" /> Kembalikan ke Default
           </Button>
         </div>
+          </TabsContent>
+
+          <TabsContent value="attendance" className="space-y-6 mt-0">
+            <AttendanceThresholdsTab />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Hidden Password Change Dialog */}
