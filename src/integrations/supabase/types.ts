@@ -609,10 +609,12 @@ export type Database = {
           incoming_stock: number | null
           item_name: string
           minimum_threshold: number | null
+          outgoing_stock: number
           outlet_id: string | null
           record_date: string
           starting_stock: number | null
           user_id: string
+          waste: number
         }
         Insert: {
           created_at?: string | null
@@ -621,10 +623,12 @@ export type Database = {
           incoming_stock?: number | null
           item_name: string
           minimum_threshold?: number | null
+          outgoing_stock?: number
           outlet_id?: string | null
           record_date?: string
           starting_stock?: number | null
           user_id: string
+          waste?: number
         }
         Update: {
           created_at?: string | null
@@ -633,10 +637,12 @@ export type Database = {
           incoming_stock?: number | null
           item_name?: string
           minimum_threshold?: number | null
+          outgoing_stock?: number
           outlet_id?: string | null
           record_date?: string
           starting_stock?: number | null
           user_id?: string
+          waste?: number
         }
         Relationships: [
           {
