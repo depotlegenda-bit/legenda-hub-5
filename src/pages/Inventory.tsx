@@ -197,16 +197,24 @@ export default function InventoryPage() {
     }
 
     setSubmitting(true);
-    const payload = rows.map((row) => ({
-      user_id: user.id,
-      outlet_id: selectedOutlet,
-      record_date: recordDate,
-      item_name: row.item_name,
-      starting_stock: Number(row.starting_stock) || 0,
-      incoming_stock: Number(row.incoming_stock) || 0,
-      ending_stock: Number(row.ending_stock) || 0,
-      minimum_threshold: Number(row.minimum_threshold) || 0,
-    }));
+    const payload = rows.map((row) => {
+      const starting = Number(row.starting_stock) || 0;
+      const incoming = Number(row.incoming_stock) || 0;
+      const waste = Number(row.waste) || 0;
+      const ending = Number(row.ending_stock) || 0;
+      return {
+        user_id: user.id,
+        outlet_id: selectedOutlet,
+        record_date: recordDate,
+        item_name: row.item_name,
+        starting_stock: starting,
+        incoming_stock: incoming,
+        waste,
+        outgoing_stock: computeOutgoing(starting, incoming, waste, ending),
+        ending_stock: ending,
+        minimum_threshold: Number(row.minimum_threshold) || 0,
+      };
+    });
 
     const { error } = await supabase.from('inventory').insert(payload);
 
