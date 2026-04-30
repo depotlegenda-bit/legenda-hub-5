@@ -448,15 +448,15 @@ export default function InventoryPage() {
                         <span>Masuk</span>
                         <span>Stok Akhir</span>
                       </div>
-                      {rows.map((row, idx) => (
-                        <div key={`${row.item_name}-${idx}`} className="grid grid-cols-1 md:grid-cols-[2fr_120px_1fr_1fr_1fr] gap-3 items-end rounded-lg border border-border/60 bg-muted/20 p-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs md:hidden">Nama Item</Label>
-                            <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm font-medium">
-                              {row.item_name}
-                            </div>
-                            <p className="text-xs text-muted-foreground">Min. threshold: {row.minimum_threshold}</p>
-                          </div>
+                       {rows.map((row, idx) => (
+                         <div key={`${row.item_name}-${idx}`} className="grid grid-cols-1 md:grid-cols-[2fr_120px_1fr_1fr_1fr] gap-3 items-start rounded-lg border border-border/60 bg-muted/20 p-3">
+                           <div className="space-y-1">
+                             <Label className="text-xs md:hidden">Nama Item</Label>
+                             <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm font-medium">
+                               {row.item_name}
+                             </div>
+                             <p className="text-xs text-muted-foreground">Min. threshold: {row.minimum_threshold}</p>
+                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs md:hidden">Satuan</Label>
                             <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm">
