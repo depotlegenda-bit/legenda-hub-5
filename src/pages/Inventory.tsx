@@ -425,21 +425,27 @@ export default function InventoryPage() {
                   <div className="w-full md:w-auto">
                     <CsvImportButton
                       entityLabel="Stok Harian"
-                      headers={['record_date', 'item_name', 'starting_stock', 'incoming_stock', 'ending_stock']}
+                      headers={['record_date', 'item_name', 'starting_stock', 'incoming_stock', 'waste', 'ending_stock']}
                       templateFilename="template-stok-harian"
-                      sampleRows={materials.slice(0, 3).map((material) => [recordDate, material.name, 0, 0, 0])}
+                      sampleRows={materials.slice(0, 3).map((material) => [recordDate, material.name, 0, 0, 0, 0])}
                       parseRow={(row) => {
                         const date = (row.record_date || '').trim();
                         const name = (row.item_name || '').trim();
                         const material = materialNameMap.get(name.toLowerCase());
                         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('record_date harus YYYY-MM-DD');
                         if (!material) throw new Error('item_name harus sesuai daftar bahan pada cabang terpilih');
+                        const starting = Number(row.starting_stock) || 0;
+                        const incoming = Number(row.incoming_stock) || 0;
+                        const waste = Number(row.waste) || 0;
+                        const ending = Number(row.ending_stock) || 0;
                         return {
                           record_date: date,
                           item_name: material.name,
-                          starting_stock: Number(row.starting_stock) || 0,
-                          incoming_stock: Number(row.incoming_stock) || 0,
-                          ending_stock: Number(row.ending_stock) || 0,
+                          starting_stock: starting,
+                          incoming_stock: incoming,
+                          waste,
+                          outgoing_stock: computeOutgoing(starting, incoming, waste, ending),
+                          ending_stock: ending,
                           minimum_threshold: material.minimum_threshold,
                         };
                       }}
@@ -452,7 +458,7 @@ export default function InventoryPage() {
                         return { success: importRows.length, failed: 0 };
                       }}
                       onImported={fetchInventory}
-                      helperText="Nama item harus mengikuti master bahan pada cabang yang sedang dipilih. Minimum threshold otomatis mengikuti master bahan."
+                      helperText="Stok awal otomatis dari stok akhir hari sebelumnya. Stok keluar otomatis = awal + masuk − waste − akhir."
                     />
                   </div>
                 </CardHeader>
@@ -463,15 +469,23 @@ export default function InventoryPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="hidden md:grid grid-cols-[2fr_120px_1fr_1fr_1fr] gap-3 px-1 text-xs font-medium text-muted-foreground">
+                      <div className="hidden md:grid grid-cols-[2fr_90px_90px_90px_90px_90px_90px] gap-3 px-1 text-xs font-medium text-muted-foreground">
                         <span>Nama Item</span>
                         <span>Satuan</span>
                         <span>Stok Awal</span>
                         <span>Masuk</span>
+                        <span>Waste</span>
+                        <span>Keluar</span>
                         <span>Stok Akhir</span>
                       </div>
-                       {rows.map((row, idx) => (
-                         <div key={`${row.item_name}-${idx}`} className="grid grid-cols-1 md:grid-cols-[2fr_120px_1fr_1fr_1fr] gap-3 items-start rounded-lg border border-border/60 bg-muted/20 p-3">
+                       {rows.map((row, idx) => {
+                         const starting = Number(row.starting_stock) || 0;
+                         const incoming = Number(row.incoming_stock) || 0;
+                         const waste = Number(row.waste) || 0;
+                         const ending = Number(row.ending_stock) || 0;
+                         const outgoing = computeOutgoing(starting, incoming, waste, ending);
+                         return (
+                         <div key={`${row.item_name}-${idx}`} className="grid grid-cols-1 md:grid-cols-[2fr_90px_90px_90px_90px_90px_90px] gap-3 items-start rounded-lg border border-border/60 bg-muted/20 p-3">
                            <div className="space-y-1">
                              <Label className="text-xs md:hidden">Nama Item</Label>
                              <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm font-medium">
@@ -487,18 +501,42 @@ export default function InventoryPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs md:hidden">Stok Awal</Label>
-                            <Input type="number" placeholder="0" value={row.starting_stock} onChange={(e) => updateRow(idx, 'starting_stock', e.target.value)} />
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              value={row.starting_stock}
+                              readOnly
+                              tabIndex={-1}
+                              className="bg-muted/50 cursor-not-allowed"
+                              title="Otomatis dari stok akhir hari sebelumnya"
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs md:hidden">Masuk</Label>
                             <Input type="number" placeholder="0" value={row.incoming_stock} onChange={(e) => updateRow(idx, 'incoming_stock', e.target.value)} />
                           </div>
                           <div className="space-y-1">
+                            <Label className="text-xs md:hidden">Waste</Label>
+                            <Input type="number" placeholder="0" value={row.waste} onChange={(e) => updateRow(idx, 'waste', e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs md:hidden">Keluar</Label>
+                            <Input
+                              type="number"
+                              value={outgoing}
+                              readOnly
+                              tabIndex={-1}
+                              className="bg-muted/50 cursor-not-allowed"
+                              title="Otomatis: stok awal + masuk − waste − stok akhir"
+                            />
+                          </div>
+                          <div className="space-y-1">
                             <Label className="text-xs md:hidden">Stok Akhir</Label>
                             <Input type="number" placeholder="0" value={row.ending_stock} onChange={(e) => updateRow(idx, 'ending_stock', e.target.value)} />
                           </div>
                         </div>
-                      ))}
+                         );
+                       })}
                     </>
                   )}
                 </CardContent>
