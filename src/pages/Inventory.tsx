@@ -76,7 +76,7 @@ export default function InventoryPage() {
   const [history, setHistory] = useState<InventoryRecord[]>([]);
 
   const canManage = role === 'management';
-  const canEditMaterials = role === 'management' || role === 'pic' || role === 'stockman';
+  const canEditMaterials = role === 'admin' || role === 'management' || role === 'pic' || role === 'stockman';
   const canViewAll = role === 'management' || role === 'pic' || role === 'stockman';
 
   const materialNameMap = useMemo(
