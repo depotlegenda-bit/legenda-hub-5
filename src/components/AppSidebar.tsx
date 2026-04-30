@@ -79,10 +79,22 @@ export default function AppSidebar() {
         />
       )}
 
+      {/* Desktop reopen button when sidebar is collapsed */}
+      {desktopCollapsed && (
+        <button
+          onClick={() => setDesktopCollapsed(false)}
+          aria-label="Tampilkan menu"
+          className="hidden md:flex fixed top-4 left-4 z-50 items-center justify-center w-10 h-10 rounded-lg bg-sidebar text-sidebar-foreground border border-sidebar-border shadow-lg hover:bg-sidebar-accent transition"
+        >
+          <PanelLeft className="w-5 h-5" />
+        </button>
+      )}
+
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 h-[100dvh] w-72 max-w-[85vw] bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 md:w-64 md:translate-x-0 md:z-40 shadow-2xl md:shadow-none',
-          open ? 'translate-x-0' : '-translate-x-full'
+          'fixed top-0 left-0 z-50 h-[100dvh] w-72 max-w-[85vw] bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 md:w-64 md:z-40 shadow-2xl md:shadow-none',
+          open ? 'translate-x-0' : '-translate-x-full',
+          desktopCollapsed ? 'md:-translate-x-full' : 'md:translate-x-0'
         )}
         style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
@@ -94,14 +106,24 @@ export default function AppSidebar() {
         >
           <X className="w-4 h-4" />
         </button>
-        <div className="p-6 border-b border-sidebar-border bg-sidebar-accent/30 flex flex-col items-center">
+        <button
+          type="button"
+          onClick={() => {
+            // Desktop only: collapse sidebar. On mobile do nothing (keeps existing behavior).
+            if (window.matchMedia('(min-width: 768px)').matches) {
+              setDesktopCollapsed(true);
+            }
+          }}
+          className="w-full p-6 border-b border-sidebar-border bg-sidebar-accent/30 flex flex-col items-center md:cursor-pointer md:hover:bg-sidebar-accent/50 transition"
+          aria-label="Sembunyikan menu (desktop)"
+        >
           <img
             src={settings.customLogoUrl || logoKop}
             alt="Logo Perusahaan"
-            className="max-h-16 w-auto object-contain"
+            className="max-h-16 w-auto object-contain pointer-events-none"
           />
-          <p className="text-xs text-sidebar-foreground/60 mt-2">Business Management</p>
-        </div>
+          <p className="text-xs text-sidebar-foreground/60 mt-2 pointer-events-none">Business Management</p>
+        </button>
 
         <nav
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
