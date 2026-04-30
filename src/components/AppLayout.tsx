@@ -25,7 +25,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               src={nagaBg}
               alt=""
               aria-hidden="true"
-              className="pointer-events-none select-none fixed top-16 left-0 md:top-4 md:left-64 w-[10vw] min-w-[60px] opacity-20 md:opacity-25 z-0"
+              className={cn(
+                'pointer-events-none select-none fixed top-16 left-0 md:top-4 w-[10vw] min-w-[60px] opacity-20 md:opacity-25 z-0 transition-[left] duration-300',
+                collapsed ? 'md:left-16' : 'md:left-64'
+              )}
             />
             <img
               src={macanBg}
