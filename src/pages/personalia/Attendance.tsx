@@ -867,6 +867,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 <th className="p-3">Karyawan</th>
                 <th className="p-3">Waktu</th>
                 <th className="p-3">Tipe</th>
+                <th className="p-3">Status Jam</th>
                 <th className="p-3">Lokasi</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Catatan</th>
@@ -877,6 +878,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               {filtered.map((log) => {
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
+                const status = getAttendanceStatus(log.created_at, log.log_type, thresholds);
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
@@ -893,6 +895,16 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                       )}>
                         {log.log_type === 'check_in' ? 'IN' : 'OUT'}
                       </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className={cn('px-2 py-0.5 rounded text-xs font-medium w-fit', status.className)}>
+                          {status.label}
+                        </span>
+                        {status.key !== 'unknown' && status.key !== 'on_time' && (
+                          <span className="text-[10px] font-mono text-muted-foreground">{formatDiffMinutes(status.diffMinutes)}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       <a href={mapsLink} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs font-mono">
