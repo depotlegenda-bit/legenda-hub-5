@@ -695,7 +695,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
 function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; name: string }[]; allProfiles: Profile[]; role: AppRole | null }) {
   const { toast } = useToast();
   const isAdmin = role === 'admin';
-  const { thresholds } = useAttendanceThresholds();
+  const { resolve: resolveThresholds } = useAttendanceThresholds();
   const [logs, setLogs] = useState<any[]>([]);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -736,7 +736,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
-    const status = getAttendanceStatus(log.created_at, log.log_type, thresholds);
+    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id));
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
@@ -878,7 +878,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               {filtered.map((log) => {
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
-                const status = getAttendanceStatus(log.created_at, log.log_type, thresholds);
+                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id));
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
