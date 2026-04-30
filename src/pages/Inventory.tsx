@@ -114,6 +114,7 @@ export default function InventoryPage() {
         unit: material.unit || 'pcs',
         starting_stock: String(currentRecord?.starting_stock ?? latestRecord?.ending_stock ?? ''),
         incoming_stock: String(currentRecord?.incoming_stock ?? ''),
+        waste: String(currentRecord?.waste ?? ''),
         ending_stock: String(currentRecord?.ending_stock ?? ''),
         minimum_threshold: String(material.minimum_threshold ?? 0),
       };
@@ -127,6 +128,8 @@ export default function InventoryPage() {
           item_name: material.name,
           starting_stock: latestRecord?.starting_stock ?? 0,
           incoming_stock: latestRecord?.incoming_stock ?? 0,
+          waste: latestRecord?.waste ?? 0,
+          outgoing_stock: latestRecord?.outgoing_stock ?? 0,
           ending_stock: latestRecord?.ending_stock ?? 0,
           minimum_threshold: material.minimum_threshold ?? 0,
           record_date: latestRecord?.record_date ?? recordDate,
