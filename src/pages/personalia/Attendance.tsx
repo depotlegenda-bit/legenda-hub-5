@@ -924,7 +924,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                         <span className={cn('px-2 py-0.5 rounded text-xs font-medium w-fit', status.className)}>
                           {status.label}
                         </span>
-                        {status.key !== 'unknown' && status.key !== 'on_time' && (
+                        {status.key !== 'unknown' && status.key !== 'on_time' && status.key !== 'exempt' && (
                           <span className="text-[10px] font-mono text-muted-foreground">{formatDiffMinutes(status.diffMinutes)}</span>
                         )}
                       </div>
