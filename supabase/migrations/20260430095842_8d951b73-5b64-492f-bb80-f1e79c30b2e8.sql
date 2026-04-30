@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS public.attendance_thresholds_outlet_unique;
+DROP INDEX IF EXISTS public.attendance_thresholds_global_unique;
