@@ -165,6 +165,42 @@ export type Database = {
           },
         ]
       }
+      attendance_thresholds: {
+        Row: {
+          check_in_late_after: string
+          check_in_start: string
+          check_out_earliest: string
+          check_out_latest: string
+          created_at: string
+          early_checkin_minutes: number
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          check_in_late_after?: string
+          check_in_start?: string
+          check_out_earliest?: string
+          check_out_latest?: string
+          created_at?: string
+          early_checkin_minutes?: number
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          check_in_late_after?: string
+          check_in_start?: string
+          check_out_earliest?: string
+          check_out_latest?: string
+          created_at?: string
+          early_checkin_minutes?: number
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       cashbon: {
         Row: {
           amount: number
