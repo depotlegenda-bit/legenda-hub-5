@@ -149,7 +149,28 @@ export default function AttendanceThresholdsTab() {
     toast.message(`Shift "${name}" ditambahkan. Atur jam lalu klik Simpan untuk menyimpannya.`);
   };
 
-  // Preview status berdasarkan nilai yang sedang diedit
+  const handleEditRow = (row: typeof rows[number]) => {
+    setActiveOutlet(row.outlet_id ?? GLOBAL_KEY);
+    setActiveShift(row.shift_name || 'Default');
+    // Scroll ke atas form
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast.message(`Memuat pengaturan: ${row.outlet_id ? outlets.find((o) => o.id === row.outlet_id)?.name ?? 'Cabang' : 'Global'} • shift "${row.shift_name}"`);
+  };
+
+  const handleDeleteRow = async (row: typeof rows[number]) => {
+    const outletLabel = row.outlet_id ? outlets.find((o) => o.id === row.outlet_id)?.name ?? 'cabang' : 'global';
+    if (!confirm(`Hapus pengaturan ${outletLabel} • shift "${row.shift_name}"?`)) return;
+    const { error } = await (supabase as any).from('attendance_thresholds').delete().eq('id', row.id);
+    if (error) {
+      toast.error(error.message || 'Gagal menghapus pengaturan');
+      return;
+    }
+    toast.success('Pengaturan dihapus');
+    refetch();
+  };
+
+  const outletName = (id: string | null) =>
+    id ? outlets.find((o) => o.id === id)?.name ?? '—' : 'Default Global';
   const editingThresholds = {
     check_in_start: checkInStart,
     check_in_late_after: checkInLate,
