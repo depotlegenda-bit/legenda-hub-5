@@ -736,12 +736,15 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
+    const status = getAttendanceStatus(log.created_at, log.log_type, thresholds);
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
       karyawan: prof?.full_name || '-',
       outlet: outletMap.get(log.outlet_id || '') || '-',
       tipe: log.log_type === 'check_in' ? 'Check In' : 'Check Out',
+      status_jam: status.label,
+      selisih: formatDiffMinutes(status.diffMinutes),
       latitude: Number(log.latitude).toFixed(6),
       longitude: Number(log.longitude).toFixed(6),
       jarak_meter: log.distance_from_outlet_meters != null ? Math.round(log.distance_from_outlet_meters) : '',
