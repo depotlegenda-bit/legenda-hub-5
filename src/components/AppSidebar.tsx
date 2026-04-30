@@ -20,14 +20,8 @@ export default function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const [desktopCollapsed, setDesktopCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('dl-sidebar-collapsed-v1') === '1';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('dl-sidebar-collapsed-v1', desktopCollapsed ? '1' : '0');
-  }, [desktopCollapsed]);
+  const desktopCollapsed = useSidebarCollapsed();
+  const setDesktopCollapsed = (v: boolean) => setSidebarCollapsed(v);
 
   // Auto close drawer on route change (mobile)
   useEffect(() => {
