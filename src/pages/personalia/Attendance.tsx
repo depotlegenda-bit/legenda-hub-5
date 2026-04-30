@@ -757,7 +757,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
-    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id));
+    const exempt = isUserExempt(log.user_id);
+    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id), { exempt });
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
