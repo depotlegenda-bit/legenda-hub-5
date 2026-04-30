@@ -10,6 +10,7 @@ import ViewModeToggle from './ViewModeToggle';
 import logoKop from '@/assets/logo-kop.png';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { MENU_GROUPS } from '@/lib/menuRegistry';
+import { setSidebarCollapsed, useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 import { useMenuPermissions } from '@/hooks/useMenuPermissions';
 
 export default function AppSidebar() {
