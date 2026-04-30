@@ -17,7 +17,7 @@ import { id as idLocale } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
 import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
-import { getAttendanceStatus, formatDiffMinutes } from '@/lib/attendanceStatus';
+import { getAttendanceStatus, formatDiffMinutes, isRoleExempt } from '@/lib/attendanceStatus';
 import {
   AlertDialog,
   AlertDialogAction,
