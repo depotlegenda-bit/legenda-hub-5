@@ -377,6 +377,103 @@ export default function AttendanceThresholdsTab() {
               : `Simpan ${currentOutletId ? 'Cabang' : 'Global'} • Shift "${activeShift}"`}
           </Button>
         </div>
+
+        {/* Rekap pengaturan tersimpan */}
+        <section className="space-y-3 pt-4 border-t border-border">
+          <div className="flex items-center gap-2">
+            <ListChecks className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold">Rekap Ambang Waktu Tersimpan</h3>
+            <Badge variant="secondary" className="ml-1">{rows.length}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Daftar semua pengaturan ambang waktu per cabang & shift yang sudah disimpan. Klik
+            edit untuk memuatnya ke form di atas, atau hapus untuk menghilangkannya.
+          </p>
+
+          <div className="rounded-md border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cabang</TableHead>
+                  <TableHead>Shift</TableHead>
+                  <TableHead className="hidden md:table-cell">Check-In</TableHead>
+                  <TableHead className="hidden md:table-cell">Check-Out</TableHead>
+                  <TableHead className="hidden lg:table-cell">Toleransi Awal</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
+                      Memuat…
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading && rows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
+                      Belum ada pengaturan tersimpan.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading &&
+                  rows.map((r) => {
+                    const isActive =
+                      (r.outlet_id ?? null) === (currentOutletId ?? null) &&
+                      (r.shift_name || 'Default') === activeShift;
+                    return (
+                      <TableRow key={r.id} className={isActive ? 'bg-muted/40' : ''}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {r.outlet_id ? (
+                              <Store className="w-3.5 h-3.5 text-muted-foreground" />
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">GLOBAL</Badge>
+                            )}
+                            <span className="truncate">{outletName(r.outlet_id)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="font-normal">{r.shift_name || 'Default'}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell font-mono text-xs">
+                          {toTimeInput(r.check_in_start)} – {toTimeInput(r.check_in_late_after)}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell font-mono text-xs">
+                          {toTimeInput(r.check_out_earliest)} – {toTimeInput(r.check_out_latest)}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs">
+                          {r.early_checkin_minutes ?? 30} mnt
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditRow(r)}
+                              title="Edit pengaturan ini"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteRow(r)}
+                              title="Hapus pengaturan ini"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          </div>
+        </section>
       </CardContent>
     </Card>
   );
