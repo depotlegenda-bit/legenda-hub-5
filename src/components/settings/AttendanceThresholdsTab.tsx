@@ -4,7 +4,17 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, Save, Store, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Clock, Save, Store, Trash2, Plus, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
@@ -13,18 +23,21 @@ import { getAttendanceStatus, formatDiffMinutes, DEFAULT_THRESHOLDS } from '@/li
 
 const GLOBAL_KEY = '__global__';
 
-// Normalisasi 'HH:MM:SS' atau 'HH:MM' → 'HH:MM' untuk input type=time
 function toTimeInput(t?: string) {
   if (!t) return '';
   return t.length >= 5 ? t.slice(0, 5) : t;
 }
 
+function normalizeShiftName(s: string) {
+  return s.trim().replace(/\s+/g, ' ');
+}
+
 export default function AttendanceThresholdsTab() {
-  const { rows, getRow, refetch, loading } = useAttendanceThresholds();
+  const { rows, getRow, refetch, loading, shiftsForOutlet } = useAttendanceThresholds();
   const { outlets } = useOutlets();
 
-  // Cabang aktif yang sedang diatur (GLOBAL_KEY = default global, atau outlet.id)
   const [activeOutlet, setActiveOutlet] = useState<string>(GLOBAL_KEY);
+  const [activeShift, setActiveShift] = useState<string>('Default');
 
   const [checkInStart, setCheckInStart] = useState('07:00');
   const [checkInLate, setCheckInLate] = useState('08:00');
@@ -33,21 +46,35 @@ export default function AttendanceThresholdsTab() {
   const [earlyMinutes, setEarlyMinutes] = useState(30);
   const [saving, setSaving] = useState(false);
 
-  const currentOutletId = activeOutlet === GLOBAL_KEY ? null : activeOutlet;
-  const currentRow = getRow(currentOutletId);
+  // Dialog tambah shift
+  const [addOpen, setAddOpen] = useState(false);
+  const [newShiftName, setNewShiftName] = useState('');
 
-  // Load nilai sesuai cabang aktif. Jika belum ada baris untuk cabang ini,
-  // pakai nilai global sebagai starting point (atau DEFAULT bila global juga belum ada).
+  const currentOutletId = activeOutlet === GLOBAL_KEY ? null : activeOutlet;
+  const availableShifts = shiftsForOutlet(currentOutletId);
+
+  // Pastikan activeShift tetap valid bila ganti cabang
   useEffect(() => {
-    const src = currentRow || getRow(null) || {
-      ...DEFAULT_THRESHOLDS,
-    };
+    if (!availableShifts.includes(activeShift)) {
+      setActiveShift(availableShifts[0] || 'Default');
+    }
+  }, [activeOutlet, availableShifts.join('|')]);
+
+  const currentRow = getRow(currentOutletId, activeShift);
+
+  // Load nilai sesuai cabang+shift aktif. Fallback ke global+shift, lalu global+Default, lalu DEFAULT.
+  useEffect(() => {
+    const src =
+      currentRow ||
+      getRow(null, activeShift) ||
+      getRow(null, 'Default') ||
+      ({ ...DEFAULT_THRESHOLDS } as any);
     setCheckInStart(toTimeInput((src as any).check_in_start));
     setCheckInLate(toTimeInput((src as any).check_in_late_after));
     setCheckOutEarliest(toTimeInput((src as any).check_out_earliest));
     setCheckOutLatest(toTimeInput((src as any).check_out_latest));
     setEarlyMinutes((src as any).early_checkin_minutes ?? 30);
-  }, [activeOutlet, rows]);
+  }, [activeOutlet, activeShift, rows]);
 
   const handleSave = async () => {
     if (checkInStart >= checkInLate) {
@@ -66,6 +93,7 @@ export default function AttendanceThresholdsTab() {
       check_out_latest: checkOutLatest,
       early_checkin_minutes: earlyMinutes,
       outlet_id: currentOutletId,
+      shift_name: activeShift,
       updated_by: (await supabase.auth.getUser()).data.user?.id ?? null,
     };
     const client = supabase as any;
@@ -78,26 +106,46 @@ export default function AttendanceThresholdsTab() {
       return;
     }
     toast.success(
-      currentOutletId
-        ? `Pengaturan untuk cabang tersimpan`
-        : 'Pengaturan default global tersimpan',
+      `Tersimpan: ${currentOutletId ? 'cabang' : 'global'} • shift "${activeShift}"`,
     );
     refetch();
   };
 
-  const handleResetToGlobal = async () => {
-    if (!currentOutletId || !currentRow?.id) return;
-    if (!confirm('Hapus pengaturan khusus cabang ini? Cabang akan kembali memakai pengaturan default global.')) return;
+  const handleDeleteShift = async () => {
+    if (!currentRow?.id) {
+      // Tidak ada baris di DB untuk kombinasi ini → cukup pindah shift
+      toast.info('Belum ada data tersimpan untuk shift ini');
+      return;
+    }
+    const label = currentOutletId ? 'cabang ini' : 'pengaturan global';
+    if (!confirm(`Hapus shift "${activeShift}" untuk ${label}?`)) return;
     const { error } = await (supabase as any)
       .from('attendance_thresholds')
       .delete()
       .eq('id', currentRow.id);
     if (error) {
-      toast.error(error.message || 'Gagal menghapus pengaturan');
+      toast.error(error.message || 'Gagal menghapus shift');
       return;
     }
-    toast.success('Pengaturan cabang dihapus, kembali ke default global');
+    toast.success(`Shift "${activeShift}" dihapus`);
+    setActiveShift('Default');
     refetch();
+  };
+
+  const handleAddShift = () => {
+    const name = normalizeShiftName(newShiftName);
+    if (!name) {
+      toast.error('Nama shift tidak boleh kosong');
+      return;
+    }
+    if (availableShifts.includes(name)) {
+      toast.error('Shift dengan nama tersebut sudah ada');
+      return;
+    }
+    setActiveShift(name);
+    setAddOpen(false);
+    setNewShiftName('');
+    toast.message(`Shift "${name}" ditambahkan. Atur jam lalu klik Simpan untuk menyimpannya.`);
   };
 
   // Preview status berdasarkan nilai yang sedang diedit
@@ -118,48 +166,120 @@ export default function AttendanceThresholdsTab() {
           <Clock className="w-5 h-5 text-primary" /> Ambang Waktu Absensi
         </CardTitle>
         <CardDescription>
-          Atur jam standar check-in & check-out per cabang. Status otomatis (Tepat Waktu / Terlambat /
-          Pulang Duluan / Lembur) akan dihitung berdasarkan ambang ini dan tampil di log absen selfie.
-          Cabang yang tidak punya pengaturan khusus akan memakai pengaturan default global.
+          Atur jam standar check-in & check-out per cabang dan per shift. Status otomatis
+          (Tepat Waktu / Terlambat / Pulang Duluan / Lembur) dihitung berdasarkan ambang ini dan
+          tampil di log absen selfie. Kalau cabang/shift tidak punya pengaturan khusus, sistem
+          memakai pengaturan global, lalu shift "Default" sebagai fallback terakhir.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Pilihan cabang */}
-        <section className="space-y-2">
-          <Label className="flex items-center gap-2 text-sm font-semibold">
-            <Store className="w-4 h-4 text-muted-foreground" /> Pilih Cabang
-          </Label>
-          <div className="flex flex-wrap items-center gap-3">
-            <Select value={activeOutlet} onValueChange={setActiveOutlet}>
-              <SelectTrigger className="w-72">
-                <SelectValue placeholder="Pilih cabang" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={GLOBAL_KEY}>
-                  Default Global (semua cabang tanpa pengaturan khusus)
-                </SelectItem>
-                {outlets.map((o) => {
-                  const hasCustom = !!rows.find((r) => r.outlet_id === o.id);
-                  return (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.name} {hasCustom ? '• custom' : '• pakai default'}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            {currentOutletId && currentRow?.id && (
-              <Button variant="ghost" size="sm" onClick={handleResetToGlobal} className="text-destructive">
-                <Trash2 className="w-4 h-4 mr-1" /> Hapus & pakai default
-              </Button>
+        {/* Pilihan cabang & shift */}
+        <section className="space-y-3">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                <Store className="w-4 h-4 text-muted-foreground" /> Cabang
+              </Label>
+              <Select value={activeOutlet} onValueChange={setActiveOutlet}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih cabang" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={GLOBAL_KEY}>
+                    Default Global (semua cabang tanpa pengaturan khusus)
+                  </SelectItem>
+                  {outlets.map((o) => {
+                    const hasCustom = !!rows.find((r) => r.outlet_id === o.id);
+                    return (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.name} {hasCustom ? '• custom' : '• pakai default'}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                <Layers className="w-4 h-4 text-muted-foreground" /> Shift
+              </Label>
+              <div className="flex gap-2">
+                <Select value={activeShift} onValueChange={setActiveShift}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Pilih shift" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableShifts.map((s) => {
+                      const exists = !!getRow(currentOutletId, s);
+                      return (
+                        <SelectItem key={s} value={s}>
+                          {s} {exists ? '• tersimpan' : '• belum ada'}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+
+                <Dialog open={addOpen} onOpenChange={setAddOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon" title="Tambah shift">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Tambah Shift Baru</DialogTitle>
+                      <DialogDescription>
+                        Beri nama shift (mis. Pagi, Siang, Malam, Weekend). Nama unik per cabang.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                      <Label>Nama Shift</Label>
+                      <Input
+                        value={newShiftName}
+                        onChange={(e) => setNewShiftName(e.target.value)}
+                        placeholder="Pagi"
+                        autoFocus
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button variant="ghost" onClick={() => setAddOpen(false)}>
+                        Batal
+                      </Button>
+                      <Button onClick={handleAddShift}>
+                        <Plus className="w-4 h-4 mr-1" /> Tambah
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleDeleteShift}
+                  disabled={!currentRow?.id}
+                  title="Hapus shift ini"
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>Status:</span>
+            {currentRow?.id ? (
+              <Badge variant="secondary">
+                Tersimpan • {currentOutletId ? 'cabang' : 'global'} • shift "{activeShift}"
+              </Badge>
+            ) : (
+              <Badge variant="outline">
+                Belum ada — isi & simpan untuk membuat pengaturan {currentOutletId ? 'cabang' : 'global'} shift "{activeShift}"
+              </Badge>
             )}
           </div>
-          {currentOutletId && !currentRow?.id && (
-            <p className="text-xs text-muted-foreground">
-              Cabang ini belum punya pengaturan khusus. Mengisi & menyimpan form di bawah akan membuat
-              pengaturan khusus untuk cabang ini.
-            </p>
-          )}
         </section>
 
         <section className="space-y-3">
@@ -232,9 +352,7 @@ export default function AttendanceThresholdsTab() {
             <Save className="w-4 h-4 mr-2" />
             {saving
               ? 'Menyimpan...'
-              : currentOutletId
-                ? 'Simpan Pengaturan Cabang'
-                : 'Simpan Default Global'}
+              : `Simpan ${currentOutletId ? 'Cabang' : 'Global'} • Shift "${activeShift}"`}
           </Button>
         </div>
       </CardContent>
