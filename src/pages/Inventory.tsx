@@ -25,6 +25,7 @@ interface StockRow {
   unit: string;
   starting_stock: string;
   incoming_stock: string;
+  waste: string;
   ending_stock: string;
   minimum_threshold: string;
 }
@@ -34,11 +35,17 @@ interface InventoryRecord {
   item_name: string;
   starting_stock: number;
   incoming_stock: number;
+  waste: number;
+  outgoing_stock: number;
   ending_stock: number;
   minimum_threshold: number;
   record_date: string;
   outlet_id: string | null;
 }
+
+/** Stok keluar = stok awal + masuk − waste − stok akhir (tidak kurang dari 0). */
+const computeOutgoing = (starting: number, incoming: number, waste: number, ending: number) =>
+  Math.max(0, (starting || 0) + (incoming || 0) - (waste || 0) - (ending || 0));
 
 interface OutletMaterial {
   id: string;
@@ -107,6 +114,7 @@ export default function InventoryPage() {
         unit: material.unit || 'pcs',
         starting_stock: String(currentRecord?.starting_stock ?? latestRecord?.ending_stock ?? ''),
         incoming_stock: String(currentRecord?.incoming_stock ?? ''),
+        waste: String(currentRecord?.waste ?? ''),
         ending_stock: String(currentRecord?.ending_stock ?? ''),
         minimum_threshold: String(material.minimum_threshold ?? 0),
       };
@@ -120,6 +128,8 @@ export default function InventoryPage() {
           item_name: material.name,
           starting_stock: latestRecord?.starting_stock ?? 0,
           incoming_stock: latestRecord?.incoming_stock ?? 0,
+          waste: latestRecord?.waste ?? 0,
+          outgoing_stock: latestRecord?.outgoing_stock ?? 0,
           ending_stock: latestRecord?.ending_stock ?? 0,
           minimum_threshold: material.minimum_threshold ?? 0,
           record_date: latestRecord?.record_date ?? recordDate,
@@ -187,16 +197,24 @@ export default function InventoryPage() {
     }
 
     setSubmitting(true);
-    const payload = rows.map((row) => ({
-      user_id: user.id,
-      outlet_id: selectedOutlet,
-      record_date: recordDate,
-      item_name: row.item_name,
-      starting_stock: Number(row.starting_stock) || 0,
-      incoming_stock: Number(row.incoming_stock) || 0,
-      ending_stock: Number(row.ending_stock) || 0,
-      minimum_threshold: Number(row.minimum_threshold) || 0,
-    }));
+    const payload = rows.map((row) => {
+      const starting = Number(row.starting_stock) || 0;
+      const incoming = Number(row.incoming_stock) || 0;
+      const waste = Number(row.waste) || 0;
+      const ending = Number(row.ending_stock) || 0;
+      return {
+        user_id: user.id,
+        outlet_id: selectedOutlet,
+        record_date: recordDate,
+        item_name: row.item_name,
+        starting_stock: starting,
+        incoming_stock: incoming,
+        waste,
+        outgoing_stock: computeOutgoing(starting, incoming, waste, ending),
+        ending_stock: ending,
+        minimum_threshold: Number(row.minimum_threshold) || 0,
+      };
+    });
 
     const { error } = await supabase.from('inventory').insert(payload);
 
@@ -286,15 +304,17 @@ export default function InventoryPage() {
       return;
     }
 
-    const headers = ['Tanggal', 'Cabang', 'Nama Item', 'Stok Awal', 'Masuk', 'Stok Akhir', 'Min Threshold'];
+    const headers = ['Tanggal', 'Cabang', 'Nama Item', 'Stok Awal', 'Masuk', 'Waste', 'Keluar', 'Stok Akhir', 'Min Threshold'];
     const csvRows = [headers.join(',')];
-    data.forEach((row) => {
+    data.forEach((row: any) => {
       csvRows.push([
         row.record_date,
         `"${outletMap.get(row.outlet_id ?? '') || '-'}"`,
         `"${row.item_name}"`,
         row.starting_stock,
         row.incoming_stock,
+        row.waste ?? 0,
+        row.outgoing_stock ?? 0,
         row.ending_stock,
         row.minimum_threshold,
       ].join(','));
@@ -323,13 +343,15 @@ export default function InventoryPage() {
     doc.text(`Dicetak: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 28);
     autoTable(doc, {
       startY: 35,
-      head: [['Tanggal', 'Cabang', 'Item', 'Stok Awal', 'Masuk', 'Stok Akhir', 'Threshold']],
-      body: data.map((row) => [
+      head: [['Tanggal', 'Cabang', 'Item', 'Stok Awal', 'Masuk', 'Waste', 'Keluar', 'Stok Akhir', 'Threshold']],
+      body: data.map((row: any) => [
         row.record_date,
         outletMap.get(row.outlet_id ?? '') || '-',
         row.item_name,
         row.starting_stock,
         row.incoming_stock,
+        row.waste ?? 0,
+        row.outgoing_stock ?? 0,
         row.ending_stock,
         row.minimum_threshold,
       ]),
@@ -403,21 +425,27 @@ export default function InventoryPage() {
                   <div className="w-full md:w-auto">
                     <CsvImportButton
                       entityLabel="Stok Harian"
-                      headers={['record_date', 'item_name', 'starting_stock', 'incoming_stock', 'ending_stock']}
+                      headers={['record_date', 'item_name', 'starting_stock', 'incoming_stock', 'waste', 'ending_stock']}
                       templateFilename="template-stok-harian"
-                      sampleRows={materials.slice(0, 3).map((material) => [recordDate, material.name, 0, 0, 0])}
+                      sampleRows={materials.slice(0, 3).map((material) => [recordDate, material.name, 0, 0, 0, 0])}
                       parseRow={(row) => {
                         const date = (row.record_date || '').trim();
                         const name = (row.item_name || '').trim();
                         const material = materialNameMap.get(name.toLowerCase());
                         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('record_date harus YYYY-MM-DD');
                         if (!material) throw new Error('item_name harus sesuai daftar bahan pada cabang terpilih');
+                        const starting = Number(row.starting_stock) || 0;
+                        const incoming = Number(row.incoming_stock) || 0;
+                        const waste = Number(row.waste) || 0;
+                        const ending = Number(row.ending_stock) || 0;
                         return {
                           record_date: date,
                           item_name: material.name,
-                          starting_stock: Number(row.starting_stock) || 0,
-                          incoming_stock: Number(row.incoming_stock) || 0,
-                          ending_stock: Number(row.ending_stock) || 0,
+                          starting_stock: starting,
+                          incoming_stock: incoming,
+                          waste,
+                          outgoing_stock: computeOutgoing(starting, incoming, waste, ending),
+                          ending_stock: ending,
                           minimum_threshold: material.minimum_threshold,
                         };
                       }}
@@ -430,7 +458,7 @@ export default function InventoryPage() {
                         return { success: importRows.length, failed: 0 };
                       }}
                       onImported={fetchInventory}
-                      helperText="Nama item harus mengikuti master bahan pada cabang yang sedang dipilih. Minimum threshold otomatis mengikuti master bahan."
+                      helperText="Stok awal otomatis dari stok akhir hari sebelumnya. Stok keluar otomatis = awal + masuk − waste − akhir."
                     />
                   </div>
                 </CardHeader>
@@ -441,15 +469,23 @@ export default function InventoryPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="hidden md:grid grid-cols-[2fr_120px_1fr_1fr_1fr] gap-3 px-1 text-xs font-medium text-muted-foreground">
+                      <div className="hidden md:grid grid-cols-[2fr_90px_90px_90px_90px_90px_90px] gap-3 px-1 text-xs font-medium text-muted-foreground">
                         <span>Nama Item</span>
                         <span>Satuan</span>
                         <span>Stok Awal</span>
                         <span>Masuk</span>
+                        <span>Waste</span>
+                        <span>Keluar</span>
                         <span>Stok Akhir</span>
                       </div>
-                       {rows.map((row, idx) => (
-                         <div key={`${row.item_name}-${idx}`} className="grid grid-cols-1 md:grid-cols-[2fr_120px_1fr_1fr_1fr] gap-3 items-start rounded-lg border border-border/60 bg-muted/20 p-3">
+                       {rows.map((row, idx) => {
+                         const starting = Number(row.starting_stock) || 0;
+                         const incoming = Number(row.incoming_stock) || 0;
+                         const waste = Number(row.waste) || 0;
+                         const ending = Number(row.ending_stock) || 0;
+                         const outgoing = computeOutgoing(starting, incoming, waste, ending);
+                         return (
+                         <div key={`${row.item_name}-${idx}`} className="grid grid-cols-1 md:grid-cols-[2fr_90px_90px_90px_90px_90px_90px] gap-3 items-start rounded-lg border border-border/60 bg-muted/20 p-3">
                            <div className="space-y-1">
                              <Label className="text-xs md:hidden">Nama Item</Label>
                              <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm font-medium">
@@ -465,18 +501,42 @@ export default function InventoryPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs md:hidden">Stok Awal</Label>
-                            <Input type="number" placeholder="0" value={row.starting_stock} onChange={(e) => updateRow(idx, 'starting_stock', e.target.value)} />
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              value={row.starting_stock}
+                              readOnly
+                              tabIndex={-1}
+                              className="bg-muted/50 cursor-not-allowed"
+                              title="Otomatis dari stok akhir hari sebelumnya"
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs md:hidden">Masuk</Label>
                             <Input type="number" placeholder="0" value={row.incoming_stock} onChange={(e) => updateRow(idx, 'incoming_stock', e.target.value)} />
                           </div>
                           <div className="space-y-1">
+                            <Label className="text-xs md:hidden">Waste</Label>
+                            <Input type="number" placeholder="0" value={row.waste} onChange={(e) => updateRow(idx, 'waste', e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs md:hidden">Keluar</Label>
+                            <Input
+                              type="number"
+                              value={outgoing}
+                              readOnly
+                              tabIndex={-1}
+                              className="bg-muted/50 cursor-not-allowed"
+                              title="Otomatis: stok awal + masuk − waste − stok akhir"
+                            />
+                          </div>
+                          <div className="space-y-1">
                             <Label className="text-xs md:hidden">Stok Akhir</Label>
                             <Input type="number" placeholder="0" value={row.ending_stock} onChange={(e) => updateRow(idx, 'ending_stock', e.target.value)} />
                           </div>
                         </div>
-                      ))}
+                         );
+                       })}
                     </>
                   )}
                 </CardContent>
