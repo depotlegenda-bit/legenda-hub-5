@@ -824,6 +824,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 { header: 'Karyawan', accessor: 'karyawan' },
                 { header: 'Outlet', accessor: 'outlet' },
                 { header: 'Tipe', accessor: 'tipe' },
+                { header: 'Status Jam', accessor: 'status_jam' },
+                { header: 'Selisih', accessor: 'selisih' },
                 { header: 'Latitude', accessor: 'latitude' },
                 { header: 'Longitude', accessor: 'longitude' },
                 { header: 'Jarak (m)', accessor: 'jarak_meter' },
