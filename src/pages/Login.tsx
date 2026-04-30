@@ -191,6 +191,26 @@ export default function Login() {
                     </Select>
                   </div>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Jabatan</Label>
+                    <Select value={jobTitle} onValueChange={setJobTitle}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Pilih jabatan" /></SelectTrigger>
+                      <SelectContent className="z-[200] max-h-60" position="popper" sideOffset={4}>
+                        {JOB_TITLES.map((j) => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status Kerja</Label>
+                    <Select value={employmentStatus} onValueChange={setEmploymentStatus}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Pilih status" /></SelectTrigger>
+                      <SelectContent className="z-[200] max-h-60" position="popper" sideOffset={4}>
+                        {EMPLOYMENT_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label>Cabang / Outlet Tempat Bekerja</Label>
                   <Select value={outletId} onValueChange={setOutletId}>
