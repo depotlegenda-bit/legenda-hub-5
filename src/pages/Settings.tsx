@@ -7,14 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAppSettings, FONT_OPTIONS, hexToHsl, hslToHex, FontFamilyKey } from '@/hooks/useAppSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { Settings as SettingsIcon, RotateCcw, Upload, Image as ImageIcon, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, RotateCcw, Upload, Image as ImageIcon, KeyRound, Eye, EyeOff, Palette, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import nagaBg from '@/assets/naga-bg.png';
+import AttendanceThresholdsTab from '@/components/settings/AttendanceThresholdsTab';
 
 function ColorPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
@@ -118,10 +120,22 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <SettingsIcon className="w-7 h-7 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Pengaturan Tampilan</h1>
-            <p className="text-sm text-muted-foreground">Kustomisasi font, warna, logo, dan elemen visual aplikasi.</p>
+            <h1 className="text-2xl font-bold">Pengaturan</h1>
+            <p className="text-sm text-muted-foreground">Kustomisasi tampilan & atur ambang waktu absensi.</p>
           </div>
         </div>
+
+        <Tabs defaultValue="appearance" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="appearance" className="gap-2">
+              <Palette className="w-4 h-4" /> Tampilan
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="gap-2">
+              <Clock className="w-4 h-4" /> Absensi
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="appearance" className="space-y-6 mt-0">
 
         {/* Typography */}
         <Card>
@@ -289,6 +303,12 @@ export default function SettingsPage() {
             <RotateCcw className="w-4 h-4 mr-2" /> Kembalikan ke Default
           </Button>
         </div>
+          </TabsContent>
+
+          <TabsContent value="attendance" className="space-y-6 mt-0">
+            <AttendanceThresholdsTab />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Hidden Password Change Dialog */}

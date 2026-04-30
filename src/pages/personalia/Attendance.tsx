@@ -16,6 +16,8 @@ import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
 import { usePersistentDraft } from '@/hooks/usePersistentDraft';
+import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
+import { getAttendanceStatus, formatDiffMinutes } from '@/lib/attendanceStatus';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -693,6 +695,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
 function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; name: string }[]; allProfiles: Profile[]; role: AppRole | null }) {
   const { toast } = useToast();
   const isAdmin = role === 'admin';
+  const { thresholds } = useAttendanceThresholds();
   const [logs, setLogs] = useState<any[]>([]);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -733,12 +736,15 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
+    const status = getAttendanceStatus(log.created_at, log.log_type, thresholds);
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
       karyawan: prof?.full_name || '-',
       outlet: outletMap.get(log.outlet_id || '') || '-',
       tipe: log.log_type === 'check_in' ? 'Check In' : 'Check Out',
+      status_jam: status.label,
+      selisih: formatDiffMinutes(status.diffMinutes),
       latitude: Number(log.latitude).toFixed(6),
       longitude: Number(log.longitude).toFixed(6),
       jarak_meter: log.distance_from_outlet_meters != null ? Math.round(log.distance_from_outlet_meters) : '',
@@ -818,6 +824,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 { header: 'Karyawan', accessor: 'karyawan' },
                 { header: 'Outlet', accessor: 'outlet' },
                 { header: 'Tipe', accessor: 'tipe' },
+                { header: 'Status Jam', accessor: 'status_jam' },
+                { header: 'Selisih', accessor: 'selisih' },
                 { header: 'Latitude', accessor: 'latitude' },
                 { header: 'Longitude', accessor: 'longitude' },
                 { header: 'Jarak (m)', accessor: 'jarak_meter' },
@@ -859,6 +867,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 <th className="p-3">Karyawan</th>
                 <th className="p-3">Waktu</th>
                 <th className="p-3">Tipe</th>
+                <th className="p-3">Status Jam</th>
                 <th className="p-3">Lokasi</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Catatan</th>
@@ -869,6 +878,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               {filtered.map((log) => {
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
+                const status = getAttendanceStatus(log.created_at, log.log_type, thresholds);
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
@@ -885,6 +895,16 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                       )}>
                         {log.log_type === 'check_in' ? 'IN' : 'OUT'}
                       </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className={cn('px-2 py-0.5 rounded text-xs font-medium w-fit', status.className)}>
+                          {status.label}
+                        </span>
+                        {status.key !== 'unknown' && status.key !== 'on_time' && (
+                          <span className="text-[10px] font-mono text-muted-foreground">{formatDiffMinutes(status.diffMinutes)}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       <a href={mapsLink} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs font-mono">
@@ -929,7 +949,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={isAdmin ? 8 : 7} className="p-8 text-center text-muted-foreground">Belum ada log absen selfie pada tanggal ini.</td></tr>
+                <tr><td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-muted-foreground">Belum ada log absen selfie pada tanggal ini.</td></tr>
               )}
             </tbody>
           </table>
