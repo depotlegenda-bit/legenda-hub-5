@@ -506,11 +506,15 @@ export default function InventoryPage() {
                     ]}
                     parseRow={(row) => {
                       const name = (row.name || '').trim();
-                      if (!name) throw new Error('name wajib diisi');
+                      if (!name) throw new Error('Kolom "name" wajib diisi');
+                      const rawUnit = (row.unit || '').trim();
+                      const rawThr = (row.minimum_threshold || '').toString().trim().replace(/\./g, '').replace(',', '.');
+                      const thr = rawThr === '' ? 0 : Number(rawThr);
+                      if (Number.isNaN(thr)) throw new Error(`minimum_threshold "${row.minimum_threshold}" bukan angka valid`);
                       return {
                         name,
-                        unit: (row.unit || 'pcs').trim() || 'pcs',
-                        minimum_threshold: Number(row.minimum_threshold) || 0,
+                        unit: rawUnit || 'pcs',
+                        minimum_threshold: thr,
                       };
                     }}
                     onImport={async (importRows) => {
@@ -518,6 +522,7 @@ export default function InventoryPage() {
 
                       const dedupedRows = Array.from(new Map(importRows.map((row) => [row.name.toLowerCase(), row])).values());
                       let failed = 0;
+                      const errors: string[] = [];
 
                       for (const row of dedupedRows) {
                         const existing = materialNameMap.get(row.name.toLowerCase());
@@ -530,7 +535,10 @@ export default function InventoryPage() {
                               minimum_threshold: row.minimum_threshold,
                             } as never)
                             .eq('id', existing.id);
-                          if (error) failed += 1;
+                          if (error) {
+                            failed += 1;
+                            errors.push(`${row.name}: ${error.message}`);
+                          }
                           continue;
                         }
 
@@ -541,14 +549,17 @@ export default function InventoryPage() {
                           minimum_threshold: row.minimum_threshold,
                           created_by: user?.id ?? null,
                         } as never);
-                        if (error) failed += 1;
+                        if (error) {
+                          failed += 1;
+                          errors.push(`${row.name}: ${error.message}`);
+                        }
                       }
 
                       await fetchInventory();
                       return {
                         success: dedupedRows.length - failed,
                         failed,
-                        message: failed > 0 ? 'Sebagian bahan gagal diproses.' : 'Bahan berhasil diimpor.',
+                        message: failed > 0 ? `Sebagian gagal: ${errors.slice(0, 3).join(' | ')}` : 'Bahan berhasil diimpor.',
                       };
                     }}
                     onImported={fetchInventory}

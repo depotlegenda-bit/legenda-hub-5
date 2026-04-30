@@ -1,15 +1,58 @@
 import { triggerDownload } from './exportUtils';
 
 /**
+ * Auto-detect the most likely delimiter from the header line.
+ * Tries comma, semicolon, then tab. Picks the one that appears most
+ * (outside quotes) on the first non-empty line.
+ */
+function detectDelimiter(text: string): string {
+  // Sample first non-empty line outside quotes
+  let line = '';
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      inQ = !inQ;
+      line += ch;
+      continue;
+    }
+    if (!inQ && (ch === '\n' || ch === '\r')) {
+      if (line.length > 0) break;
+      continue;
+    }
+    line += ch;
+  }
+  const candidates = [',', ';', '\t'];
+  let best = ',';
+  let bestCount = -1;
+  for (const d of candidates) {
+    // Count occurrences outside quotes (line already contains quotes literally)
+    let count = 0;
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') q = !q;
+      else if (!q && c === d) count++;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      best = d;
+    }
+  }
+  return best;
+}
+
+/**
  * Minimal RFC-4180-ish CSV parser that supports:
  * - quoted fields with escaped quotes ("")
- * - commas inside quoted fields
+ * - delimiters inside quoted fields
  * - CR/LF line endings
- * Returns an array of rows; each row is an array of string cells.
+ * - auto-detection of `,`, `;` or tab as delimiter (Excel locale-friendly)
  */
-export function parseCSV(text: string): string[][] {
+export function parseCSV(text: string, delimiter?: string): string[][] {
   // Strip BOM if present
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  const delim = delimiter || detectDelimiter(text);
 
   const rows: string[][] = [];
   let row: string[] = [];
@@ -33,7 +76,7 @@ export function parseCSV(text: string): string[][] {
     }
     if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ',') {
+    } else if (ch === delim) {
       row.push(cell);
       cell = '';
     } else if (ch === '\n' || ch === '\r') {
@@ -55,13 +98,17 @@ export function parseCSV(text: string): string[][] {
   return rows;
 }
 
-/** Parse CSV text into an array of objects keyed by header. */
+/**
+ * Parse CSV text into an array of objects keyed by header.
+ * Headers are normalized to lowercase + trimmed so that "Name" and " name "
+ * both map to the `name` key consumers expect.
+ */
 export function parseCSVtoObjects<T extends Record<string, string>>(
   text: string,
 ): T[] {
   const rows = parseCSV(text);
   if (rows.length === 0) return [];
-  const headers = rows[0].map((h) => h.trim());
+  const headers = rows[0].map((h) => h.trim().toLowerCase().replace(/^\ufeff/, ''));
   return rows.slice(1).map((cells) => {
     const obj: Record<string, string> = {};
     headers.forEach((h, idx) => {
