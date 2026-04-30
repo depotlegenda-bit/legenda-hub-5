@@ -695,6 +695,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
 function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; name: string }[]; allProfiles: Profile[]; role: AppRole | null }) {
   const { toast } = useToast();
   const isAdmin = role === 'admin';
+  const { thresholds } = useAttendanceThresholds();
   const [logs, setLogs] = useState<any[]>([]);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [userFilter, setUserFilter] = useState<string>('all');
