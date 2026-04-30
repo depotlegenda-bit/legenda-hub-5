@@ -701,6 +701,27 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const [userFilter, setUserFilter] = useState<string>('all');
   const [outletFilter, setOutletFilter] = useState<string>('all');
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [rolesByUser, setRolesByUser] = useState<Record<string, string[]>>({});
+
+  // Fetch role per user supaya bisa menentukan siapa yang dikecualikan dari ambang waktu.
+  useEffect(() => {
+    if (allProfiles.length === 0) { setRolesByUser({}); return; }
+    const ids = allProfiles.map((p) => p.user_id);
+    supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .in('user_id', ids)
+      .then(({ data }) => {
+        const map: Record<string, string[]> = {};
+        (data || []).forEach((r: any) => {
+          if (!map[r.user_id]) map[r.user_id] = [];
+          map[r.user_id].push(String(r.role));
+        });
+        setRolesByUser(map);
+      });
+  }, [allProfiles]);
+
+  const isUserExempt = (userId: string) => (rolesByUser[userId] || []).some((r) => isRoleExempt(r));
 
   const visibleProfiles = useMemo(
     () => outletFilter === 'all' ? allProfiles : allProfiles.filter((p) => p.outlet_id === outletFilter),
