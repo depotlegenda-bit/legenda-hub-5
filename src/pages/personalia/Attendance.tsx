@@ -900,7 +900,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               {filtered.map((log) => {
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
-                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id));
+                const exempt = isUserExempt(log.user_id);
+                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id), { exempt });
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
