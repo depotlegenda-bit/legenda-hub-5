@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useOutlets } from '@/hooks/useOutlets';
 import { useTabParam } from '@/hooks/useTabParam';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -68,7 +69,7 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useTabParam('stock', 'inventoryTab');
   const [submitting, setSubmitting] = useState(false);
   const [materialsSubmitting, setMaterialsSubmitting] = useState(false);
-  const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
+  const [recordDate, setRecordDate] = usePersistentState<string>('inventory:recordDate', new Date().toISOString().split('T')[0]);
   const [rows, setRows] = useState<StockRow[]>([]);
   const [materials, setMaterials] = useState<OutletMaterial[]>([]);
   const [materialForm, setMaterialForm] = useState(defaultMaterialForm);
