@@ -923,6 +923,11 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                       </span>
                     </td>
                     <td className="p-3">
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground">
+                        {shiftName}
+                      </span>
+                    </td>
+                    <td className="p-3">
                       <div className="flex flex-col gap-0.5">
                         <span className={cn('px-2 py-0.5 rounded text-xs font-medium w-fit', status.className)}>
                           {status.label}
