@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarCheck, ChevronLeft, ChevronRight, Save, MapPin, Plus, Crosshair, Trash2, AlertTriangle } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Save, MapPin, Plus, Crosshair, Trash2, AlertTriangle, Pencil } from 'lucide-react';
 import { useOutlets } from '@/hooks/useOutlets';
 import { useAuth, AppRole } from '@/hooks/useAuth';
 import { useTabParam } from '@/hooks/useTabParam';
@@ -755,11 +755,46 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const outletMap = useMemo(() => new Map(outlets.map((o) => [o.id, o.name])), [outlets]);
   const filtered = userFilter === 'all' ? logs : logs.filter((l) => l.user_id === userFilter);
 
+  const STATUS_OVERRIDE_OPTIONS: { key: string; label: string }[] = [
+    { key: 'on_time', label: 'Tepat Waktu' },
+    { key: 'late', label: 'Terlambat' },
+    { key: 'early_in', label: 'Datang Awal' },
+    { key: 'early_out', label: 'Pulang Duluan' },
+    { key: 'overtime', label: 'Lembur' },
+    { key: 'exempt', label: 'Bebas Jam' },
+  ];
+
+  const computeStatus = (log: any) => {
+    const exempt = isUserExempt(log.user_id);
+    const shiftName = log.shift_name || 'Default';
+    const auto = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
+    if (log.status_override) {
+      const opt = STATUS_OVERRIDE_OPTIONS.find((o) => o.key === log.status_override);
+      if (opt) {
+        // Reuse className mapping by calling getAttendanceStatus once with exempt trick is not ideal;
+        // instead, derive class from a lookup of a synthetic call.
+        const synthetic = { ...auto, key: log.status_override as any, label: opt.label };
+        // Reuse the className convention by pulling from STATUS_LABELS via a fresh getAttendanceStatus
+        // call won't work cleanly; instead inline a minimal class map:
+        const CLS: Record<string, string> = {
+          on_time:  'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+          late:     'bg-destructive/15 text-destructive',
+          early_in: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+          early_out:'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+          overtime: 'bg-purple-500/15 text-purple-700 dark:text-purple-400',
+          exempt:   'bg-slate-500/15 text-slate-700 dark:text-slate-300',
+        };
+        synthetic.className = CLS[log.status_override] || auto.className;
+        return { info: synthetic, overridden: true };
+      }
+    }
+    return { info: auto, overridden: false };
+  };
+
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
-    const exempt = isUserExempt(log.user_id);
-    const shiftName = (log as any).shift_name || 'Default';
-    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
+    const shiftName = log.shift_name || 'Default';
+    const { info: status, overridden } = computeStatus(log);
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
@@ -767,7 +802,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
       outlet: outletMap.get(log.outlet_id || '') || '-',
       tipe: log.log_type === 'check_in' ? 'Check In' : 'Check Out',
       shift: shiftName,
-      status_jam: status.label,
+      status_jam: status.label + (overridden ? ' (koreksi)' : ''),
       selisih: formatDiffMinutes(status.diffMinutes),
       latitude: Number(log.latitude).toFixed(6),
       longitude: Number(log.longitude).toFixed(6),
@@ -785,6 +820,24 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
       return;
     }
     toast({ title: 'Log dihapus' });
+    reload();
+  };
+
+  const correctStatus = async (logId: string, override: string | null, note: string) => {
+    const payload: any = override === null
+      ? { status_override: null, status_override_by: null, status_override_at: null, status_override_note: null }
+      : {
+          status_override: override,
+          status_override_by: (await supabase.auth.getUser()).data.user?.id || null,
+          status_override_at: new Date().toISOString(),
+          status_override_note: note || null,
+        };
+    const { error } = await supabase.from('attendance_logs').update(payload).eq('id', logId);
+    if (error) {
+      toast({ title: 'Gagal koreksi status', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: override === null ? 'Koreksi dihapus' : 'Status dikoreksi' });
     reload();
   };
 
@@ -903,9 +956,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               {filtered.map((log) => {
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
-                const exempt = isUserExempt(log.user_id);
-                const shiftName = (log as any).shift_name || 'Default';
-                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
+                const shiftName = log.shift_name || 'Default';
+                const { info: status, overridden } = computeStatus(log);
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
@@ -931,10 +983,15 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                     <td className="p-3">
                       <div className="flex flex-col gap-0.5">
                         <span className={cn('px-2 py-0.5 rounded text-xs font-medium w-fit', status.className)}>
-                          {status.label}
+                          {status.label}{overridden ? ' *' : ''}
                         </span>
                         {status.key !== 'unknown' && status.key !== 'on_time' && status.key !== 'exempt' && (
                           <span className="text-[10px] font-mono text-muted-foreground">{formatDiffMinutes(status.diffMinutes)}</span>
+                        )}
+                        {overridden && (
+                          <span className="text-[10px] text-muted-foreground italic" title={log.status_override_note || ''}>
+                            dikoreksi admin
+                          </span>
                         )}
                       </div>
                     </td>
@@ -956,25 +1013,32 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                     <td className="p-3 text-xs text-muted-foreground max-w-[200px] truncate">{log.notes || '-'}</td>
                     {isAdmin && (
                       <td className="p-3 text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Hapus log absen selfie?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                {prof?.full_name || '—'} · {format(new Date(log.created_at), 'dd MMM yyyy HH:mm:ss')} · {log.log_type === 'check_in' ? 'Check In' : 'Check Out'}. Tindakan ini tidak dapat dibatalkan.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Batal</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteOne(log.id)}>Hapus</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex items-center justify-end gap-1">
+                          <CorrectStatusDialog
+                            log={log}
+                            options={STATUS_OVERRIDE_OPTIONS}
+                            onSave={(override, note) => correctStatus(log.id, override, note)}
+                          />
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Hapus log absen selfie?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {prof?.full_name || '—'} · {format(new Date(log.created_at), 'dd MMM yyyy HH:mm:ss')} · {log.log_type === 'check_in' ? 'Check In' : 'Check Out'}. Tindakan ini tidak dapat dibatalkan.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Batal</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteOne(log.id)}>Hapus</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -988,6 +1052,95 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function CorrectStatusDialog({
+  log,
+  options,
+  onSave,
+}: {
+  log: any;
+  options: { key: string; label: string }[];
+  onSave: (override: string | null, note: string) => Promise<void> | void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState<string>(log.status_override || '');
+  const [note, setNote] = useState<string>(log.status_override_note || '');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setValue(log.status_override || '');
+      setNote(log.status_override_note || '');
+    }
+  }, [open, log.status_override, log.status_override_note]);
+
+  const handleSave = async () => {
+    setBusy(true);
+    await onSave(value || null, note);
+    setBusy(false);
+    setOpen(false);
+  };
+
+  const handleClear = async () => {
+    setBusy(true);
+    await onSave(null, '');
+    setBusy(false);
+    setOpen(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm" title="Koreksi status jam">
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Koreksi Status Jam</AlertDialogTitle>
+          <AlertDialogDescription>
+            Ubah status hasil perhitungan otomatis (mis. dari Terlambat menjadi Tepat Waktu).
+            Status koreksi akan menggantikan status otomatis di tampilan & ekspor.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Status Baru</label>
+            <select
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+            >
+              <option value="">— Gunakan otomatis —</option>
+              {options.map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Catatan Koreksi (opsional)</label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="mis. salah pilih shift, jam server tidak sinkron, dll."
+            />
+          </div>
+        </div>
+        <AlertDialogFooter>
+          {log.status_override && (
+            <Button variant="outline" onClick={handleClear} disabled={busy}>
+              Hapus Koreksi
+            </Button>
+          )}
+          <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSave} disabled={busy}>
+            Simpan
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
