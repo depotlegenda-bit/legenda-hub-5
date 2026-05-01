@@ -841,6 +841,19 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
     reload();
   };
 
+  const editShift = async (logId: string, newShift: string) => {
+    const { error } = await supabase
+      .from('attendance_logs')
+      .update({ shift_name: newShift } as any)
+      .eq('id', logId);
+    if (error) {
+      toast({ title: 'Gagal mengubah shift', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Shift diperbarui', description: `Shift diubah menjadi ${newShift}.` });
+    reload();
+  };
+
   const deleteAllVisible = async () => {
     if (filtered.length === 0) return;
     setBulkDeleting(true);
