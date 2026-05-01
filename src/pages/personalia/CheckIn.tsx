@@ -132,6 +132,14 @@ export default function CheckInPage() {
   };
   useEffect(() => { fetchRecent(); }, [user]);
 
+  // Pastikan shift terpilih selalu ada dalam daftar shift outlet aktif
+  useEffect(() => {
+    if (availableShifts.length === 0) return;
+    if (!availableShifts.includes(selectedShift)) {
+      setSelectedShift(availableShifts[0]);
+    }
+  }, [availableShifts, selectedShift]);
+
   // Start camera
   const startCamera = async () => {
     try {
