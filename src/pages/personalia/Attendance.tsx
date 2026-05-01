@@ -695,7 +695,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
 function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; name: string }[]; allProfiles: Profile[]; role: AppRole | null }) {
   const { toast } = useToast();
   const isAdmin = role === 'admin';
-  const { resolve: resolveThresholds } = useAttendanceThresholds();
+  const { resolve: resolveThresholds, shiftsForOutlet, shiftNames } = useAttendanceThresholds();
   const [logs, setLogs] = useState<any[]>([]);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -838,6 +838,19 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
       return;
     }
     toast({ title: override === null ? 'Koreksi dihapus' : 'Status dikoreksi' });
+    reload();
+  };
+
+  const editShift = async (logId: string, newShift: string) => {
+    const { error } = await supabase
+      .from('attendance_logs')
+      .update({ shift_name: newShift } as any)
+      .eq('id', logId);
+    if (error) {
+      toast({ title: 'Gagal mengubah shift', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Shift diperbarui', description: `Shift diubah menjadi ${newShift}.` });
     reload();
   };
 
@@ -1014,6 +1027,15 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                     {isAdmin && (
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <EditShiftDialog
+                            log={log}
+                            availableShifts={Array.from(new Set([
+                              ...(shiftsForOutlet(log.outlet_id) || []),
+                              ...(shiftNames || []),
+                              'Default',
+                            ]))}
+                            onSave={(newShift) => editShift(log.id, newShift)}
+                          />
                           <CorrectStatusDialog
                             log={log}
                             options={STATUS_OVERRIDE_OPTIONS}
@@ -1134,6 +1156,79 @@ function CorrectStatusDialog({
               Hapus Koreksi
             </Button>
           )}
+          <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSave} disabled={busy}>
+            Simpan
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function EditShiftDialog({
+  log,
+  availableShifts,
+  onSave,
+}: {
+  log: any;
+  availableShifts: string[];
+  onSave: (newShift: string) => Promise<void> | void;
+}) {
+  const currentShift = log.shift_name || 'Default';
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState<string>(currentShift);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) setValue(currentShift);
+  }, [open, currentShift]);
+
+  const handleSave = async () => {
+    if (!value || value === currentShift) {
+      setOpen(false);
+      return;
+    }
+    setBusy(true);
+    await onSave(value);
+    setBusy(false);
+    setOpen(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm" title="Ubah shift">
+          <CalendarCheck className="w-3.5 h-3.5" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Ubah Shift Log Absen</AlertDialogTitle>
+          <AlertDialogDescription>
+            Pilih shift yang benar untuk log ini. Status jam (Tepat Waktu / Terlambat / Pulang Duluan)
+            akan dihitung ulang otomatis sesuai ambang waktu shift yang dipilih.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Shift Saat Ini</label>
+            <div className="text-sm text-muted-foreground">{currentShift}</div>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Shift Baru</label>
+            <select
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+            >
+              {availableShifts.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
           <AlertDialogAction onClick={handleSave} disabled={busy}>
             Simpan
