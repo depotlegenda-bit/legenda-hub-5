@@ -123,6 +123,7 @@ export type Database = {
           out_of_radius: boolean
           outlet_id: string | null
           selfie_url: string
+          shift_name: string
           user_id: string
         }
         Insert: {
@@ -138,6 +139,7 @@ export type Database = {
           out_of_radius?: boolean
           outlet_id?: string | null
           selfie_url: string
+          shift_name?: string
           user_id: string
         }
         Update: {
@@ -153,6 +155,7 @@ export type Database = {
           out_of_radius?: boolean
           outlet_id?: string | null
           selfie_url?: string
+          shift_name?: string
           user_id?: string
         }
         Relationships: [

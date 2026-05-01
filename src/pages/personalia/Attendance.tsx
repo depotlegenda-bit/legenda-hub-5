@@ -758,13 +758,15 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
     const exempt = isUserExempt(log.user_id);
-    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id), { exempt });
+    const shiftName = (log as any).shift_name || 'Default';
+    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
       karyawan: prof?.full_name || '-',
       outlet: outletMap.get(log.outlet_id || '') || '-',
       tipe: log.log_type === 'check_in' ? 'Check In' : 'Check Out',
+      shift: shiftName,
       status_jam: status.label,
       selisih: formatDiffMinutes(status.diffMinutes),
       latitude: Number(log.latitude).toFixed(6),
@@ -889,6 +891,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 <th className="p-3">Karyawan</th>
                 <th className="p-3">Waktu</th>
                 <th className="p-3">Tipe</th>
+                <th className="p-3">Shift</th>
                 <th className="p-3">Status Jam</th>
                 <th className="p-3">Lokasi</th>
                 <th className="p-3">Status</th>
@@ -901,7 +904,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
                 const exempt = isUserExempt(log.user_id);
-                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id), { exempt });
+                const shiftName = (log as any).shift_name || 'Default';
+                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
@@ -917,6 +921,11 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                         log.log_type === 'check_in' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-blue-500/15 text-blue-700'
                       )}>
                         {log.log_type === 'check_in' ? 'IN' : 'OUT'}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground">
+                        {shiftName}
                       </span>
                     </td>
                     <td className="p-3">

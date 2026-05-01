@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, MapPin, Clock, RefreshCw, LogIn, LogOut, AlertTriangle, CheckCircle2, ExternalLink, Building2 } from 'lucide-react';
+import { Camera, MapPin, Clock, RefreshCw, LogIn, LogOut, AlertTriangle, CheckCircle2, ExternalLink, Building2, Briefcase } from 'lucide-react';
+import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
 
 interface ProfileLite {
   full_name: string;
@@ -64,8 +65,12 @@ export default function CheckInPage() {
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
+  const [selectedShift, setSelectedShift] = useState<string>('Default');
 
   const canChooseOutlet = role === 'admin' || role === 'management';
+  const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
+  const availableShifts = shiftsForOutlet(selectedOutletId);
+  const activeThresholds = resolveThresholds(selectedOutletId, selectedShift);
 
   // Realtime clock
   useEffect(() => {
@@ -126,6 +131,14 @@ export default function CheckInPage() {
     }
   };
   useEffect(() => { fetchRecent(); }, [user]);
+
+  // Pastikan shift terpilih selalu ada dalam daftar shift outlet aktif
+  useEffect(() => {
+    if (availableShifts.length === 0) return;
+    if (!availableShifts.includes(selectedShift)) {
+      setSelectedShift(availableShifts[0]);
+    }
+  }, [availableShifts, selectedShift]);
 
   // Start camera
   const startCamera = async () => {
@@ -242,10 +255,11 @@ export default function CheckInPage() {
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('attendance-selfies').getPublicUrl(filename);
 
-      const { error: insErr } = await supabase.from('attendance_logs').insert({
+      const { error: insErr } = await (supabase as any).from('attendance_logs').insert({
         user_id: user.id,
         outlet_id: effectiveOutlet?.id || null,
         log_type: logType,
+        shift_name: selectedShift || 'Default',
         selfie_url: publicUrl,
         latitude: coords.coords.latitude,
         longitude: coords.coords.longitude,
@@ -341,6 +355,30 @@ export default function CheckInPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Shift selector — semua role bisa pilih shift agar status absen dievaluasi pakai jam shift yang benar */}
+        <Card className="glass-card border-primary/20">
+          <CardContent className="p-4 space-y-2">
+            <Label className="flex items-center gap-2">
+              <Briefcase className="w-4 h-4" /> Pilih Shift Hari Ini
+            </Label>
+            <Select value={selectedShift} onValueChange={setSelectedShift}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih shift..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableShifts.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Status terlambat / tepat waktu dihitung berdasarkan jam shift yang dipilih.
+              {' '}Jam shift <strong>{selectedShift}</strong>: masuk {activeThresholds.check_in_start.slice(0,5)}–{activeThresholds.check_in_late_after.slice(0,5)},
+              {' '}pulang {activeThresholds.check_out_earliest.slice(0,5)}–{activeThresholds.check_out_latest.slice(0,5)}.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Distance warning */}
         {distance != null && (
