@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, MapPin, Clock, RefreshCw, LogIn, LogOut, AlertTriangle, CheckCircle2, ExternalLink, Building2 } from 'lucide-react';
+import { Camera, MapPin, Clock, RefreshCw, LogIn, LogOut, AlertTriangle, CheckCircle2, ExternalLink, Building2, Briefcase } from 'lucide-react';
+import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
 
 interface ProfileLite {
   full_name: string;
