@@ -11,6 +11,7 @@ import { CalendarCheck, ChevronLeft, ChevronRight, Save, MapPin, Plus, Crosshair
 import { useOutlets } from '@/hooks/useOutlets';
 import { useAuth, AppRole } from '@/hooks/useAuth';
 import { useTabParam } from '@/hooks/useTabParam';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -438,8 +439,8 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
   const { toast } = useToast();
   const isAdmin = role === 'admin';
   const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = usePersistentState<number>('attendance:recap:month', now.getMonth() + 1);
+  const [year, setYear] = usePersistentState<number>('attendance:recap:year', now.getFullYear());
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
@@ -697,9 +698,9 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const isAdmin = role === 'admin';
   const { resolve: resolveThresholds, shiftsForOutlet, shiftNames } = useAttendanceThresholds();
   const [logs, setLogs] = useState<any[]>([]);
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [userFilter, setUserFilter] = useState<string>('all');
-  const [outletFilter, setOutletFilter] = useState<string>('all');
+  const [date, setDate] = usePersistentState<string>('attendance:logs:date', new Date().toISOString().split('T')[0]);
+  const [userFilter, setUserFilter] = usePersistentState<string>('attendance:logs:userFilter', 'all');
+  const [outletFilter, setOutletFilter] = usePersistentState<string>('attendance:logs:outletFilter', 'all');
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [rolesByUser, setRolesByUser] = useState<Record<string, string[]>>({});
 
