@@ -1055,6 +1055,95 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   );
 }
 
+function CorrectStatusDialog({
+  log,
+  options,
+  onSave,
+}: {
+  log: any;
+  options: { key: string; label: string }[];
+  onSave: (override: string | null, note: string) => Promise<void> | void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState<string>(log.status_override || '');
+  const [note, setNote] = useState<string>(log.status_override_note || '');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setValue(log.status_override || '');
+      setNote(log.status_override_note || '');
+    }
+  }, [open, log.status_override, log.status_override_note]);
+
+  const handleSave = async () => {
+    setBusy(true);
+    await onSave(value || null, note);
+    setBusy(false);
+    setOpen(false);
+  };
+
+  const handleClear = async () => {
+    setBusy(true);
+    await onSave(null, '');
+    setBusy(false);
+    setOpen(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm" title="Koreksi status jam">
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Koreksi Status Jam</AlertDialogTitle>
+          <AlertDialogDescription>
+            Ubah status hasil perhitungan otomatis (mis. dari Terlambat menjadi Tepat Waktu).
+            Status koreksi akan menggantikan status otomatis di tampilan & ekspor.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Status Baru</label>
+            <select
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+            >
+              <option value="">— Gunakan otomatis —</option>
+              {options.map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Catatan Koreksi (opsional)</label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="mis. salah pilih shift, jam server tidak sinkron, dll."
+            />
+          </div>
+        </div>
+        <AlertDialogFooter>
+          {log.status_override && (
+            <Button variant="outline" onClick={handleClear} disabled={busy}>
+              Hapus Koreksi
+            </Button>
+          )}
+          <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSave} disabled={busy}>
+            Simpan
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 interface OutletRow {
   id: string;
   name: string;
