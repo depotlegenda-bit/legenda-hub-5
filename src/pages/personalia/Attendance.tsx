@@ -755,11 +755,46 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const outletMap = useMemo(() => new Map(outlets.map((o) => [o.id, o.name])), [outlets]);
   const filtered = userFilter === 'all' ? logs : logs.filter((l) => l.user_id === userFilter);
 
+  const STATUS_OVERRIDE_OPTIONS: { key: string; label: string }[] = [
+    { key: 'on_time', label: 'Tepat Waktu' },
+    { key: 'late', label: 'Terlambat' },
+    { key: 'early_in', label: 'Datang Awal' },
+    { key: 'early_out', label: 'Pulang Duluan' },
+    { key: 'overtime', label: 'Lembur' },
+    { key: 'exempt', label: 'Bebas Jam' },
+  ];
+
+  const computeStatus = (log: any) => {
+    const exempt = isUserExempt(log.user_id);
+    const shiftName = log.shift_name || 'Default';
+    const auto = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
+    if (log.status_override) {
+      const opt = STATUS_OVERRIDE_OPTIONS.find((o) => o.key === log.status_override);
+      if (opt) {
+        // Reuse className mapping by calling getAttendanceStatus once with exempt trick is not ideal;
+        // instead, derive class from a lookup of a synthetic call.
+        const synthetic = { ...auto, key: log.status_override as any, label: opt.label };
+        // Reuse the className convention by pulling from STATUS_LABELS via a fresh getAttendanceStatus
+        // call won't work cleanly; instead inline a minimal class map:
+        const CLS: Record<string, string> = {
+          on_time:  'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+          late:     'bg-destructive/15 text-destructive',
+          early_in: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+          early_out:'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+          overtime: 'bg-purple-500/15 text-purple-700 dark:text-purple-400',
+          exempt:   'bg-slate-500/15 text-slate-700 dark:text-slate-300',
+        };
+        synthetic.className = CLS[log.status_override] || auto.className;
+        return { info: synthetic, overridden: true };
+      }
+    }
+    return { info: auto, overridden: false };
+  };
+
   const exportRows = filtered.map((log) => {
     const prof = profileMap.get(log.user_id);
-    const exempt = isUserExempt(log.user_id);
-    const shiftName = (log as any).shift_name || 'Default';
-    const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
+    const shiftName = log.shift_name || 'Default';
+    const { info: status, overridden } = computeStatus(log);
     return {
       tanggal: format(new Date(log.created_at), 'yyyy-MM-dd'),
       waktu: format(new Date(log.created_at), 'HH:mm:ss'),
@@ -767,7 +802,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
       outlet: outletMap.get(log.outlet_id || '') || '-',
       tipe: log.log_type === 'check_in' ? 'Check In' : 'Check Out',
       shift: shiftName,
-      status_jam: status.label,
+      status_jam: status.label + (overridden ? ' (koreksi)' : ''),
       selisih: formatDiffMinutes(status.diffMinutes),
       latitude: Number(log.latitude).toFixed(6),
       longitude: Number(log.longitude).toFixed(6),
