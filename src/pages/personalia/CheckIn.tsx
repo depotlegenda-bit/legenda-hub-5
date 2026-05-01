@@ -68,8 +68,12 @@ export default function CheckInPage() {
   const [selectedShift, setSelectedShift] = useState<string>('Default');
 
   const canChooseOutlet = role === 'admin' || role === 'management';
-  const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
-  const availableShifts = shiftsForOutlet(selectedOutletId);
+  const { shiftsForOutlet, shiftNames, resolve: resolveThresholds } = useAttendanceThresholds();
+  // Gabungkan shift outlet aktif + semua shift global, supaya selalu ada pilihan
+  // walau outlet user belum punya konfigurasi shift sendiri.
+  const outletShifts = shiftsForOutlet(selectedOutletId);
+  const mergedShifts = Array.from(new Set([...(outletShifts || []), ...(shiftNames || []), 'Default']));
+  const availableShifts = mergedShifts.length > 0 ? mergedShifts : ['Default'];
   const activeThresholds = resolveThresholds(selectedOutletId, selectedShift);
 
   // Realtime clock
