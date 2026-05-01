@@ -1166,6 +1166,79 @@ function CorrectStatusDialog({
   );
 }
 
+function EditShiftDialog({
+  log,
+  availableShifts,
+  onSave,
+}: {
+  log: any;
+  availableShifts: string[];
+  onSave: (newShift: string) => Promise<void> | void;
+}) {
+  const currentShift = log.shift_name || 'Default';
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState<string>(currentShift);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) setValue(currentShift);
+  }, [open, currentShift]);
+
+  const handleSave = async () => {
+    if (!value || value === currentShift) {
+      setOpen(false);
+      return;
+    }
+    setBusy(true);
+    await onSave(value);
+    setBusy(false);
+    setOpen(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm" title="Ubah shift">
+          <CalendarCheck className="w-3.5 h-3.5" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Ubah Shift Log Absen</AlertDialogTitle>
+          <AlertDialogDescription>
+            Pilih shift yang benar untuk log ini. Status jam (Tepat Waktu / Terlambat / Pulang Duluan)
+            akan dihitung ulang otomatis sesuai ambang waktu shift yang dipilih.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Shift Saat Ini</label>
+            <div className="text-sm text-muted-foreground">{currentShift}</div>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Shift Baru</label>
+            <select
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+            >
+              {availableShifts.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Batal</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSave} disabled={busy}>
+            Simpan
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 interface OutletRow {
   id: string;
   name: string;
