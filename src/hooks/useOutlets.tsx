@@ -6,10 +6,33 @@ interface Outlet {
   name: string;
 }
 
+const STORAGE_KEY = 'outlet:selected';
+
+function readStored(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return localStorage.getItem(STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
 export function useOutlets() {
   const [outlets, setOutlets] = useState<Outlet[]>([]);
-  const [selectedOutlet, setSelectedOutlet] = useState<string>('');
+  const [selectedOutlet, setSelectedOutletState] = useState<string>(() => readStored());
   const [loading, setLoading] = useState(true);
+
+  const setSelectedOutlet = (id: string) => {
+    setSelectedOutletState(id);
+    if (typeof window !== 'undefined') {
+      try {
+        if (id) localStorage.setItem(STORAGE_KEY, id);
+        else localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+  };
 
   useEffect(() => {
     supabase
@@ -19,10 +42,20 @@ export function useOutlets() {
       .then(({ data }) => {
         if (data) {
           setOutlets(data);
-          if (data.length > 0) setSelectedOutlet(data[0].id);
+          const stored = readStored();
+          // Pakai pilihan tersimpan jika masih valid, jika tidak fallback ke yang pertama.
+          const validStored = stored && data.some((o) => o.id === stored) ? stored : '';
+          if (validStored) {
+            setSelectedOutletState(validStored);
+          } else if (!selectedOutlet && data.length > 0) {
+            setSelectedOutlet(data[0].id);
+          } else if (selectedOutlet && !data.some((o) => o.id === selectedOutlet) && data.length > 0) {
+            setSelectedOutlet(data[0].id);
+          }
         }
         setLoading(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { outlets, selectedOutlet, setSelectedOutlet, loading };
