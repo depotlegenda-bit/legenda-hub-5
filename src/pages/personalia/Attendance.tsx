@@ -1027,6 +1027,15 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                     {isAdmin && (
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <EditShiftDialog
+                            log={log}
+                            availableShifts={Array.from(new Set([
+                              ...(shiftsForOutlet(log.outlet_id) || []),
+                              ...(shiftNames || []),
+                              'Default',
+                            ]))}
+                            onSave={(newShift) => editShift(log.id, newShift)}
+                          />
                           <CorrectStatusDialog
                             log={log}
                             options={STATUS_OVERRIDE_OPTIONS}
