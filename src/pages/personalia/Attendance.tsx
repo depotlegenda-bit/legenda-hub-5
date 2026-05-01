@@ -773,7 +773,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
       auto.label = 'Tepat Waktu';
       auto.className = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
     }
-    if (log.status_override) {
+    if (log.status_override && log.status_override !== 'overtime') {
       const opt = STATUS_OVERRIDE_OPTIONS.find((o) => o.key === log.status_override);
       if (opt) {
         // Reuse className mapping by calling getAttendanceStatus once with exempt trick is not ideal;
