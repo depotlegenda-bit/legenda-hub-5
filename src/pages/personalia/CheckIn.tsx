@@ -356,6 +356,30 @@ export default function CheckInPage() {
           </Card>
         )}
 
+        {/* Shift selector — semua role bisa pilih shift agar status absen dievaluasi pakai jam shift yang benar */}
+        <Card className="glass-card border-primary/20">
+          <CardContent className="p-4 space-y-2">
+            <Label className="flex items-center gap-2">
+              <Briefcase className="w-4 h-4" /> Pilih Shift Hari Ini
+            </Label>
+            <Select value={selectedShift} onValueChange={setSelectedShift}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih shift..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableShifts.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Status terlambat / tepat waktu dihitung berdasarkan jam shift yang dipilih.
+              {' '}Jam shift <strong>{selectedShift}</strong>: masuk {activeThresholds.check_in_start.slice(0,5)}–{activeThresholds.check_in_late_after.slice(0,5)},
+              {' '}pulang {activeThresholds.check_out_earliest.slice(0,5)}–{activeThresholds.check_out_latest.slice(0,5)}.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Distance warning */}
         {distance != null && (
           <Card className={outOfRadius ? 'border-destructive bg-destructive/5' : 'border-emerald-500/40 bg-emerald-500/5'}>
