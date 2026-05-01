@@ -766,6 +766,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
       karyawan: prof?.full_name || '-',
       outlet: outletMap.get(log.outlet_id || '') || '-',
       tipe: log.log_type === 'check_in' ? 'Check In' : 'Check Out',
+      shift: shiftName,
       status_jam: status.label,
       selisih: formatDiffMinutes(status.diffMinutes),
       latitude: Number(log.latitude).toFixed(6),
