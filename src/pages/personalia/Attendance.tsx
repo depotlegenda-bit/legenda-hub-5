@@ -890,6 +890,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 <th className="p-3">Karyawan</th>
                 <th className="p-3">Waktu</th>
                 <th className="p-3">Tipe</th>
+                <th className="p-3">Shift</th>
                 <th className="p-3">Status Jam</th>
                 <th className="p-3">Lokasi</th>
                 <th className="p-3">Status</th>
