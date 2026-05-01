@@ -124,6 +124,10 @@ export type Database = {
           outlet_id: string | null
           selfie_url: string
           shift_name: string
+          status_override: string | null
+          status_override_at: string | null
+          status_override_by: string | null
+          status_override_note: string | null
           user_id: string
         }
         Insert: {
@@ -140,6 +144,10 @@ export type Database = {
           outlet_id?: string | null
           selfie_url: string
           shift_name?: string
+          status_override?: string | null
+          status_override_at?: string | null
+          status_override_by?: string | null
+          status_override_note?: string | null
           user_id: string
         }
         Update: {
@@ -156,6 +164,10 @@ export type Database = {
           outlet_id?: string | null
           selfie_url?: string
           shift_name?: string
+          status_override?: string | null
+          status_override_at?: string | null
+          status_override_by?: string | null
+          status_override_note?: string | null
           user_id?: string
         }
         Relationships: [
