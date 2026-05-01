@@ -956,9 +956,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               {filtered.map((log) => {
                 const prof = profileMap.get(log.user_id);
                 const mapsLink = `https://www.google.com/maps?q=${log.latitude},${log.longitude}`;
-                const exempt = isUserExempt(log.user_id);
-                const shiftName = (log as any).shift_name || 'Default';
-                const status = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
+                const shiftName = log.shift_name || 'Default';
+                const { info: status, overridden } = computeStatus(log);
                 return (
                   <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="p-3">
@@ -984,10 +983,15 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                     <td className="p-3">
                       <div className="flex flex-col gap-0.5">
                         <span className={cn('px-2 py-0.5 rounded text-xs font-medium w-fit', status.className)}>
-                          {status.label}
+                          {status.label}{overridden ? ' *' : ''}
                         </span>
                         {status.key !== 'unknown' && status.key !== 'on_time' && status.key !== 'exempt' && (
                           <span className="text-[10px] font-mono text-muted-foreground">{formatDiffMinutes(status.diffMinutes)}</span>
+                        )}
+                        {overridden && (
+                          <span className="text-[10px] text-muted-foreground italic" title={log.status_override_note || ''}>
+                            dikoreksi admin
+                          </span>
                         )}
                       </div>
                     </td>
@@ -1009,25 +1013,32 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                     <td className="p-3 text-xs text-muted-foreground max-w-[200px] truncate">{log.notes || '-'}</td>
                     {isAdmin && (
                       <td className="p-3 text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Hapus log absen selfie?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                {prof?.full_name || '—'} · {format(new Date(log.created_at), 'dd MMM yyyy HH:mm:ss')} · {log.log_type === 'check_in' ? 'Check In' : 'Check Out'}. Tindakan ini tidak dapat dibatalkan.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Batal</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteOne(log.id)}>Hapus</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex items-center justify-end gap-1">
+                          <CorrectStatusDialog
+                            log={log}
+                            options={STATUS_OVERRIDE_OPTIONS}
+                            onSave={(override, note) => correctStatus(log.id, override, note)}
+                          />
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Hapus log absen selfie?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {prof?.full_name || '—'} · {format(new Date(log.created_at), 'dd MMM yyyy HH:mm:ss')} · {log.log_type === 'check_in' ? 'Check In' : 'Check Out'}. Tindakan ini tidak dapat dibatalkan.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Batal</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteOne(log.id)}>Hapus</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </td>
                     )}
                   </tr>
