@@ -255,10 +255,11 @@ export default function CheckInPage() {
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('attendance-selfies').getPublicUrl(filename);
 
-      const { error: insErr } = await supabase.from('attendance_logs').insert({
+      const { error: insErr } = await (supabase as any).from('attendance_logs').insert({
         user_id: user.id,
         outlet_id: effectiveOutlet?.id || null,
         log_type: logType,
+        shift_name: selectedShift || 'Default',
         selfie_url: publicUrl,
         latitude: coords.coords.latitude,
         longitude: coords.coords.longitude,
