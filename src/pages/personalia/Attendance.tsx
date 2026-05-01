@@ -823,6 +823,24 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
     reload();
   };
 
+  const correctStatus = async (logId: string, override: string | null, note: string) => {
+    const payload: any = override === null
+      ? { status_override: null, status_override_by: null, status_override_at: null, status_override_note: null }
+      : {
+          status_override: override,
+          status_override_by: (await supabase.auth.getUser()).data.user?.id || null,
+          status_override_at: new Date().toISOString(),
+          status_override_note: note || null,
+        };
+    const { error } = await supabase.from('attendance_logs').update(payload).eq('id', logId);
+    if (error) {
+      toast({ title: 'Gagal koreksi status', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: override === null ? 'Koreksi dihapus' : 'Status dikoreksi' });
+    reload();
+  };
+
   const deleteAllVisible = async () => {
     if (filtered.length === 0) return;
     setBulkDeleting(true);
