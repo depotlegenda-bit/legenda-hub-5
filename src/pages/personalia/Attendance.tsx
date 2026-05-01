@@ -760,7 +760,6 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
     { key: 'late', label: 'Terlambat' },
     { key: 'early_in', label: 'Datang Awal' },
     { key: 'early_out', label: 'Pulang Duluan' },
-    { key: 'overtime', label: 'Lembur' },
     { key: 'exempt', label: 'Bebas Jam' },
   ];
 
@@ -768,6 +767,12 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
     const exempt = isUserExempt(log.user_id);
     const shiftName = log.shift_name || 'Default';
     const auto = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
+    // Hilangkan label "Lembur" pada log selfie — tampilkan sebagai Tepat Waktu
+    if (auto.key === 'overtime') {
+      auto.key = 'on_time';
+      auto.label = 'Tepat Waktu';
+      auto.className = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
+    }
     if (log.status_override) {
       const opt = STATUS_OVERRIDE_OPTIONS.find((o) => o.key === log.status_override);
       if (opt) {
