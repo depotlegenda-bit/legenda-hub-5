@@ -65,8 +65,12 @@ export default function CheckInPage() {
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
+  const [selectedShift, setSelectedShift] = useState<string>('Default');
 
   const canChooseOutlet = role === 'admin' || role === 'management';
+  const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
+  const availableShifts = shiftsForOutlet(selectedOutletId);
+  const activeThresholds = resolveThresholds(selectedOutletId, selectedShift);
 
   // Realtime clock
   useEffect(() => {
