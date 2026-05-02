@@ -1338,6 +1338,33 @@ export type Database = {
         }
         Relationships: []
       }
+      shopping_buffer_settings: {
+        Row: {
+          buffer_percent: number
+          created_at: string
+          id: string
+          outlet_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          buffer_percent?: number
+          created_at?: string
+          id?: string
+          outlet_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          buffer_percent?: number
+          created_at?: string
+          id?: string
+          outlet_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       sp_history: {
         Row: {
           created_at: string
