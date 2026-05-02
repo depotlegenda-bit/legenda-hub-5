@@ -1,28 +1,32 @@
-## Penyebab Error
+## Perubahan Logika Rekomendasi Belanja
 
-Tabel `attendance_thresholds` masih memiliki dua unique index lama dari versi sebelumnya (saat tiap cabang hanya boleh punya 1 baris pengaturan):
+Mengubah rumus target stok ideal pada halaman **Stok & Inventaris → Rekomendasi Belanja** (`src/pages/inventory/ShoppingList.tsx`).
 
-- `attendance_thresholds_outlet_unique` — unik pada `outlet_id` saja
-- `attendance_thresholds_global_unique` — unik untuk baris global (outlet_id NULL)
-
-Setelah fitur multi-shift ditambahkan, index baru yang benar sudah dibuat berdasarkan kombinasi `(outlet_id, shift_name)`:
-- `uniq_attendance_thresholds_outlet_shift`
-- `uniq_attendance_thresholds_global_shift`
-
-Tapi index lama tidak pernah di-drop, jadi saat user menyimpan shift kedua untuk cabang yang sama (atau shift global kedua), database menolak dengan error `duplicate key value violates unique constraint "attendance_thresholds_outlet_unique"`.
-
-## Perbaikan
-
-Buat satu migration SQL untuk menghapus dua index lama tersebut:
-
-```sql
-DROP INDEX IF EXISTS public.attendance_thresholds_outlet_unique;
-DROP INDEX IF EXISTS public.attendance_thresholds_global_unique;
+### Sebelum
 ```
+needed = max(minimum_threshold × 2 − ending_stock, 0)
+```
+Target ideal = 2× (200%) dari stok minimum.
 
-Setelah itu:
-- Tiap cabang bisa punya banyak shift (mis. Pagi, Siang, Malam) dengan nama shift berbeda.
-- Pengaturan global juga bisa punya banyak shift.
-- Duplikat tetap dicegah oleh index baru bila kombinasi `(outlet_id, shift_name)` sama.
+### Sesudah
+```
+target_ideal = ceil(minimum_threshold × 1.3)
+needed = max(target_ideal − ending_stock, 0)
+```
+Target ideal = 130% dari stok minimum (30% di atas minimum), dibulatkan ke atas agar tidak menghasilkan angka pecahan.
 
-Tidak ada perubahan kode frontend — hook `useAttendanceThresholds` dan tab `AttendanceThresholdsTab` sudah benar menggunakan `shift_name`.
+### Contoh Perhitungan
+| Min. Threshold | Stok Sisa | Target Ideal (×1.3) | Rekomendasi Beli |
+|---|---|---|---|
+| 5  | 2  | 7   | 5  |
+| 10 | 4  | 13  | 9  |
+| 20 | 15 | 26  | 11 |
+| 8  | 8  | 11  | 3  |
+
+### File yang Diubah
+- `src/pages/inventory/ShoppingList.tsx` — ubah perhitungan `needed` dari `× 2` menjadi `Math.ceil(× 1.3)`.
+
+### Tidak Berubah
+- Kondisi munculnya item (`ending_stock ≤ minimum_threshold`) tetap sama.
+- Default `minimum_threshold = 5` jika kosong, tetap sama.
+- Tampilan tabel & ekspor CSV tetap sama (kolom Rekomendasi Beli otomatis ikut update).
