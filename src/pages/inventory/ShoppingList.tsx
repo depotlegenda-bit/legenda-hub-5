@@ -32,12 +32,17 @@ export default function ShoppingListPage() {
 
     const needToBuy = Array.from(latestByItem.values())
       .filter((item) => (item.ending_stock ?? 0) <= (item.minimum_threshold ?? 5))
-      .map((item) => ({
-        item_name: item.item_name,
-        ending_stock: item.ending_stock ?? 0,
-        minimum_threshold: item.minimum_threshold ?? 5,
-        needed: Math.max((item.minimum_threshold ?? 5) * 2 - (item.ending_stock ?? 0), 0),
-      }));
+      .map((item) => {
+        const minimum = item.minimum_threshold ?? 5;
+        const ending = item.ending_stock ?? 0;
+        const idealTarget = Math.ceil(minimum * 1.3);
+        return {
+          item_name: item.item_name,
+          ending_stock: ending,
+          minimum_threshold: minimum,
+          needed: Math.max(idealTarget - ending, 0),
+        };
+      });
 
     setItems(needToBuy);
   };
