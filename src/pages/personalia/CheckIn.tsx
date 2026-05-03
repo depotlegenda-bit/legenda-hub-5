@@ -381,8 +381,12 @@ export default function CheckInPage() {
             </Select>
             <p className="text-xs text-muted-foreground">
               Status terlambat / tepat waktu dihitung berdasarkan jam shift yang dipilih.
-              {' '}Jam shift <strong>{selectedShift}</strong>: masuk {activeThresholds.check_in_start.slice(0,5)}–{activeThresholds.check_in_late_after.slice(0,5)},
-              {' '}pulang {activeThresholds.check_out_earliest.slice(0,5)}–{activeThresholds.check_out_latest.slice(0,5)}.
+              {selectedShift ? (
+                <> Jam shift <strong>{selectedShift}</strong>: masuk {activeThresholds.check_in_start.slice(0,5)}–{activeThresholds.check_in_late_after.slice(0,5)},
+                {' '}pulang {activeThresholds.check_out_earliest.slice(0,5)}–{activeThresholds.check_out_latest.slice(0,5)}.</>
+              ) : (
+                <> Pilih shift terlebih dahulu — absen tidak dapat disimpan jika shift belum dipilih.</>
+              )}
             </p>
           </CardContent>
         </Card>
