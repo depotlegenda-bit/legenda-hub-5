@@ -134,13 +134,10 @@ export default function CheckInPage() {
   };
   useEffect(() => { fetchRecent(); }, [user]);
 
-  // Pastikan shift terpilih selalu ada dalam daftar shift outlet aktif
+  // Reset shift saat outlet berubah agar user secara eksplisit memilih shift cabang yang aktif
   useEffect(() => {
-    if (availableShifts.length === 0) return;
-    if (!availableShifts.includes(selectedShift)) {
-      setSelectedShift(availableShifts[0]);
-    }
-  }, [availableShifts, selectedShift]);
+    setSelectedShift('');
+  }, [selectedOutletId]);
 
   // Start camera
   const startCamera = async () => {
