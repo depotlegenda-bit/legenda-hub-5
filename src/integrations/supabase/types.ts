@@ -269,58 +269,79 @@ export type Database = {
       content_plans: {
         Row: {
           assigned_to: string | null
+          content_type: string | null
           created_at: string | null
           created_by: string
           description: string | null
           engagement_comments: number | null
           engagement_likes: number | null
+          engagement_link_clicks: number | null
           engagement_reach: number | null
+          engagement_saves: number | null
           engagement_shares: number | null
           engagement_views: number | null
           id: string
           notes: string | null
+          pillar_title: string | null
           platform: string
+          posted_url: string | null
           rate_card: number | null
           scheduled_date: string | null
           status: string
+          target_leads: number | null
+          target_views: number | null
           title: string
           updated_at: string | null
         }
         Insert: {
           assigned_to?: string | null
+          content_type?: string | null
           created_at?: string | null
           created_by: string
           description?: string | null
           engagement_comments?: number | null
           engagement_likes?: number | null
+          engagement_link_clicks?: number | null
           engagement_reach?: number | null
+          engagement_saves?: number | null
           engagement_shares?: number | null
           engagement_views?: number | null
           id?: string
           notes?: string | null
+          pillar_title?: string | null
           platform?: string
+          posted_url?: string | null
           rate_card?: number | null
           scheduled_date?: string | null
           status?: string
+          target_leads?: number | null
+          target_views?: number | null
           title: string
           updated_at?: string | null
         }
         Update: {
           assigned_to?: string | null
+          content_type?: string | null
           created_at?: string | null
           created_by?: string
           description?: string | null
           engagement_comments?: number | null
           engagement_likes?: number | null
+          engagement_link_clicks?: number | null
           engagement_reach?: number | null
+          engagement_saves?: number | null
           engagement_shares?: number | null
           engagement_views?: number | null
           id?: string
           notes?: string | null
+          pillar_title?: string | null
           platform?: string
+          posted_url?: string | null
           rate_card?: number | null
           scheduled_date?: string | null
           status?: string
+          target_leads?: number | null
+          target_views?: number | null
           title?: string
           updated_at?: string | null
         }
