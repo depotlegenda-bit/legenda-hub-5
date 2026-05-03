@@ -902,6 +902,26 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
         <div className="flex flex-wrap gap-2 items-center">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+          <div className="inline-flex rounded-md border border-input overflow-hidden">
+            {([
+              { v: 'all', l: 'Semua' },
+              { v: 'check_in', l: 'IN' },
+              { v: 'check_out', l: 'OUT' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setTypeFilter(opt.v)}
+                className={`px-3 h-10 text-sm transition-colors ${
+                  typeFilter === opt.v
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background hover:bg-accent'
+                }`}
+              >
+                {opt.l}
+              </button>
+            ))}
+          </div>
           <select
             value={userFilter}
             onChange={(e) => setUserFilter(e.target.value)}
