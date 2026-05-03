@@ -63,6 +63,7 @@ export default function CheckInPage() {
   const [logType, setLogType] = useState<'check_in' | 'check_out'>('check_in');
   const [notes, setNotes] = useState('');
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
+  const [logFilter, setLogFilter] = useState<'all' | 'check_in' | 'check_out'>('all');
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
   const [selectedShift, setSelectedShift] = useState<string>('');
