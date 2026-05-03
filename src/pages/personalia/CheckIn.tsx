@@ -71,8 +71,9 @@ export default function CheckInPage() {
   const canChooseOutlet = role === 'admin' || role === 'management';
   const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
   // Shift hanya yang dikonfigurasi untuk outlet aktif (atau fallback global bawaan dari hook).
-  const outletShifts = shiftsForOutlet(selectedOutletId);
-  const availableShifts = outletShifts.length > 0 ? outletShifts : ['Default'];
+  // Hilangkan shift "Default" dari pilihan user — user wajib memilih shift nyata yang dikonfigurasi.
+  const outletShifts = shiftsForOutlet(selectedOutletId).filter((s) => s.toLowerCase() !== 'default');
+  const availableShifts = outletShifts;
   const activeThresholds = resolveThresholds(selectedOutletId, selectedShift);
 
   // Realtime clock
