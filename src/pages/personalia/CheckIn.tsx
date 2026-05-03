@@ -491,27 +491,68 @@ export default function CheckInPage() {
 
         {/* Recent logs */}
         <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="text-lg">5 Absen Terakhir</CardTitle>
+          <CardHeader className="space-y-3">
+            <CardTitle className="text-lg">Riwayat Absen Terakhir</CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={logFilter === 'all' ? 'default' : 'outline'}
+                onClick={() => setLogFilter('all')}
+              >
+                Semua
+              </Button>
+              <Button
+                size="sm"
+                variant={logFilter === 'check_in' ? 'default' : 'outline'}
+                onClick={() => setLogFilter('check_in')}
+                className="gap-1"
+              >
+                <LogIn className="w-3 h-3" /> IN
+              </Button>
+              <Button
+                size="sm"
+                variant={logFilter === 'check_out' ? 'default' : 'outline'}
+                onClick={() => setLogFilter('check_out')}
+                className="gap-1"
+              >
+                <LogOut className="w-3 h-3" /> OUT
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {recentLogs.length === 0 && <p className="text-sm text-muted-foreground">Belum ada catatan absen.</p>}
-            {recentLogs.map((log) => (
-              <div key={log.id} className="flex items-center gap-3 p-2 bg-muted/40 rounded-lg">
-                <img src={log.selfie_url} alt="" className="w-12 h-12 rounded object-cover" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={log.log_type === 'check_in' ? 'default' : 'secondary'}>
-                      {log.log_type === 'check_in' ? 'IN' : 'OUT'}
-                    </Badge>
-                    {log.out_of_radius && <Badge variant="destructive" className="text-xs">Luar radius</Badge>}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(log.created_at).toLocaleString('id-ID')}
+            {(() => {
+              const filtered = recentLogs.filter((l) => logFilter === 'all' || l.log_type === logFilter);
+              const shown = filtered.slice(0, 10);
+              if (recentLogs.length === 0) {
+                return <p className="text-sm text-muted-foreground">Belum ada catatan absen.</p>;
+              }
+              if (shown.length === 0) {
+                return <p className="text-sm text-muted-foreground">Tidak ada log untuk filter ini.</p>;
+              }
+              return (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Menampilkan {shown.length} dari {recentLogs.length} log terakhir
                   </p>
-                </div>
-              </div>
-            ))}
+                  {shown.map((log) => (
+                    <div key={log.id} className="flex items-center gap-3 p-2 bg-muted/40 rounded-lg">
+                      <img src={log.selfie_url} alt="" className="w-12 h-12 rounded object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={log.log_type === 'check_in' ? 'default' : 'secondary'}>
+                            {log.log_type === 'check_in' ? 'IN' : 'OUT'}
+                          </Badge>
+                          {log.out_of_radius && <Badge variant="destructive" className="text-xs">Luar radius</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(log.created_at).toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
