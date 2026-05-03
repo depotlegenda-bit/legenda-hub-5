@@ -377,9 +377,15 @@ export default function CheckInPage() {
                 <SelectValue placeholder="Pilih shift..." />
               </SelectTrigger>
               <SelectContent>
-                {availableShifts.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
+                {availableShifts.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    Belum ada shift dikonfigurasi untuk cabang ini. Hubungi admin.
+                  </div>
+                ) : (
+                  availableShifts.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
