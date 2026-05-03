@@ -23,8 +23,8 @@ export interface CsvImportButtonProps<TParsed> {
   templateFilename: string;
   /** Optional sample rows for the template */
   sampleRows?: (string | number)[][];
-  /** Validate/transform a row to the final shape; return the value or throw an Error */
-  parseRow: (row: Record<string, string>, index: number) => TParsed;
+  /** Validate/transform a row to the final shape; return the value, return undefined to skip the row, or throw an Error */
+  parseRow: (row: Record<string, string>, index: number) => TParsed | undefined;
   /** Called with all valid rows when user confirms import. Should perform the insert. */
   onImport: (rows: TParsed[]) => Promise<{ success: number; failed: number; message?: string }>;
   /** Called after successful import (e.g. to refresh data) */
@@ -41,8 +41,8 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [parsed, setParsed] = useState<{ valid: TParsed[]; invalid: { row: number; raw: Record<string, string>; error: string }[] }>(
-    { valid: [], invalid: [] },
+  const [parsed, setParsed] = useState<{ valid: TParsed[]; invalid: { row: number; raw: Record<string, string>; error: string }[]; skipped: number }>(
+    { valid: [], invalid: [], skipped: 0 },
   );
   const [importing, setImporting] = useState(false);
 
@@ -63,14 +63,17 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
       }
       const valid: TParsed[] = [];
       const invalid: { row: number; raw: Record<string, string>; error: string }[] = [];
+      let skipped = 0;
       rawRows.forEach((raw, i) => {
         try {
-          valid.push(parseRow(raw, i));
+          const out = parseRow(raw, i);
+          if (out === undefined) skipped++;
+          else valid.push(out);
         } catch (e: any) {
           invalid.push({ row: i + 2, raw, error: e?.message || 'Invalid row' }); // +2 = header row + 1-indexed
         }
       });
-      setParsed({ valid, invalid });
+      setParsed({ valid, invalid, skipped });
       setOpen(true);
     } catch (e: any) {
       toast({ title: 'Gagal membaca file', description: e?.message, variant: 'destructive' });
@@ -97,7 +100,7 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
         });
       }
       setOpen(false);
-      setParsed({ valid: [], invalid: [] });
+      setParsed({ valid: [], invalid: [], skipped: 0 });
       onImported?.();
     } catch (e: any) {
       toast({ title: 'Import gagal', description: e?.message, variant: 'destructive' });
@@ -151,6 +154,11 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
                 </div>
               </div>
             </div>
+            {parsed.skipped > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {parsed.skipped} baris kosong diabaikan (dipakai sebagai pemisah).
+              </p>
+            )}
 
             {parsed.invalid.length > 0 && (
               <div className="border rounded-md max-h-48 overflow-y-auto">

@@ -299,21 +299,33 @@ export default function MaterialControlPage() {
                   <div className="flex gap-2 flex-wrap">
                     <CsvImportButton
                       entityLabel="Resep"
-                      headers={['menu_item_name', 'portions', 'ingredient_name', 'qty', 'unit']}
+                      headers={['menu_item_name', 'portions', 'ingredient_name', 'qty', 'unit', 'catatan']}
                       templateFilename="template-resep"
                       sampleRows={[
-                        ['Es Kopi Susu', 1, 'Kopi', 18, 'gram'],
-                        ['Es Kopi Susu', 1, 'Susu', 150, 'ml'],
-                        ['Es Kopi Susu', 1, 'Gula Aren', 30, 'ml'],
-                        ['Nasi Goreng', 1, 'Beras', 200, 'gram'],
-                        ['Nasi Goreng', 1, 'Telur', 1, 'butir'],
+                        ['Es Kopi Susu', 1, 'Espresso', 18, 'gram', 'bahan utama'],
+                        ['Es Kopi Susu', 1, 'Susu Full Cream', 150, 'ml', ''],
+                        ['Es Kopi Susu', 1, 'Gula Aren Cair', 30, 'ml', ''],
+                        ['Es Kopi Susu', 1, 'Es Batu', 80, 'gram', 'garnish'],
+                        ['', '', '', '', '', '--- baris kosong = pemisah antar menu (boleh dihapus) ---'],
+                        ['Nasi Goreng Spesial', 1, 'Beras (matang)', 200, 'gram', 'bahan utama'],
+                        ['Nasi Goreng Spesial', 1, 'Telur Ayam', 1, 'butir', ''],
+                        ['Nasi Goreng Spesial', 1, 'Bawang Merah', 10, 'gram', 'bumbu'],
+                        ['Nasi Goreng Spesial', 1, 'Bawang Putih', 5, 'gram', 'bumbu'],
+                        ['Nasi Goreng Spesial', 1, 'Cabai Rawit', 5, 'gram', 'bumbu'],
+                        ['Nasi Goreng Spesial', 1, 'Kecap Manis', 15, 'ml', 'bumbu'],
+                        ['Nasi Goreng Spesial', 1, 'Minyak Goreng', 10, 'ml', ''],
+                        ['Nasi Goreng Spesial', 1, 'Ayam Suwir', 50, 'gram', 'topping'],
+                        ['Nasi Goreng Spesial', 1, 'Daun Bawang', 5, 'gram', 'garnish'],
                       ]}
                       parseRow={(r) => {
                         const menu = (r.menu_item_name || '').trim();
                         const ingName = (r.ingredient_name || '').trim();
+                        const qtyRaw = (r.qty || '').trim();
+                        // Skip baris kosong total (pemisah visual antar menu)
+                        if (!menu && !ingName && !qtyRaw) return undefined;
                         if (!menu) throw new Error('menu_item_name wajib diisi');
                         if (!ingName) throw new Error('ingredient_name wajib diisi');
-                        const qty = Number(r.qty);
+                        const qty = Number(qtyRaw);
                         if (isNaN(qty) || qty <= 0) throw new Error('qty harus angka > 0');
                         const portions = Number(r.portions) || 1;
                         return { menu, portions, ingredient: { name: ingName, qty, unit: (r.unit || 'gram').trim() } };
@@ -332,10 +344,10 @@ export default function MaterialControlPage() {
                         }));
                         const { error } = await supabase.from('recipes').insert(payload);
                         if (error) return { success: 0, failed: payload.length, message: error.message };
-                        return { success: payload.length, failed: 0, message: `${payload.length} resep dari ${rows.length} baris` };
+                        return { success: payload.length, failed: 0, message: `${payload.length} resep dari ${rows.length} baris bahan` };
                       }}
                       onImported={fetchData}
-                      helperText="Format: 1 baris per ingredient. Baris dengan menu_item_name sama akan dijadikan 1 resep."
+                      helperText="Format: 1 baris = 1 bahan. Ulang nama menu di setiap baris bahannya — semua baris dengan menu sama otomatis digabung jadi 1 resep. Kolom 'catatan' opsional. Baris kosong total diabaikan (boleh dipakai sebagai pemisah antar menu)."
                     />
                   </div>
                 </CardHeader>
