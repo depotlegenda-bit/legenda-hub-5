@@ -1,50 +1,24 @@
 ## Tujuan
-Outlet "Manajemen" hanya muncul sebagai opsi cabang di **3 tempat** saja:
-1. **Data Karyawan** (`StaffManagement.tsx`) — agar admin bisa assign staff manajemen
-2. **Profil Saya** (`Profile.tsx`) — tampil sebagai cabang user manajemen
-3. **Rekapan Absensi** (`personalia/Attendance.tsx`) — agar absen staff manajemen tetap bisa direkap terpisah
-
-Di **semua menu lain** (Dashboard, Absen Selfie, Finance, Inventory, Performance Review, Settings, signup, dll) outlet "Manajemen" **disembunyikan** dari dropdown / filter / rekap, supaya rekapan per-cabang tidak tercampur data manajemen.
+Di halaman **Absen Selfie** (`CheckIn.tsx`), panel "5 Absen Terakhir" saat ini menampilkan log Check-In dan Check-Out tercampur, sehingga sulit dipakai untuk merekap. Tambahkan **filter cepat** untuk memilih hanya `IN`, hanya `OUT`, atau `Semua`.
 
 ## Pendekatan
 
-Tambah opsi `includeManagement` pada hook `useOutlets` (default `false`). Hook menyaring outlet bernama `"Manajemen"` (case-insensitive) dari list kecuali dipanggil `useOutlets({ includeManagement: true })`. Auto-select juga akan melewati Manajemen.
+Menambahkan toggle filter di header card "Absen Terakhir" — tidak perlu perubahan database, cukup state lokal + filter di sisi klien.
 
-Untuk fetch outlets langsung tanpa hook, tambahkan filter `.neq('name', 'Manajemen')`.
+Agar filter tetap bermakna meski hanya 5 baris, naikkan jumlah fetch terakhir menjadi **20 log** (tetap `.limit(20)` di Supabase), lalu tampilkan maksimal 10 baris setelah difilter. Judul card disesuaikan menjadi "Riwayat Absen Terakhir".
 
 ## Perubahan File
 
-**Hook**
-- `src/hooks/useOutlets.tsx` — tambah param `{ includeManagement?: boolean }`, filter "Manajemen" dari list & dari auto-select default.
+**`src/pages/personalia/CheckIn.tsx`**
+- Tambah state `logFilter: 'all' | 'check_in' | 'check_out'` (default `'all'`).
+- Naikkan `limit(5)` → `limit(20)` saat fetch `attendance_logs`.
+- Tambah grup tombol filter (Semua / IN / OUT) di `CardHeader` panel log, menggunakan komponen `Button` dengan variant `default`/`outline` (selaras dengan toggle Check-In/Check-Out di form submit).
+- Filter array `recentLogs` sebelum `.map()` berdasarkan `logFilter`, lalu `.slice(0, 10)`.
+- Tampilkan info ringkas hitung: misal "Menampilkan X dari Y log" (kecil, di bawah filter) supaya jelas berapa yang tersaring.
 
-**Sertakan Manajemen (pakai `includeManagement: true`)**
-- `src/pages/StaffManagement.tsx`
-- `src/pages/personalia/Attendance.tsx`
-- `src/pages/Profile.tsx` — hanya jika ada dropdown outlet; kalau cuma display `outlet_name` tidak perlu diubah
-
-**Sembunyikan Manajemen (default behavior, hanya verifikasi tidak pakai opsi include)**
-- `src/pages/Dashboard.tsx` (juga: tambah `.neq('name','Manajemen')` pada fetch langsungnya)
-- `src/pages/FinancialReport.tsx`
-- `src/pages/finance/DailyRecap.tsx`
-- `src/pages/finance/ProfitLoss.tsx`
-- `src/pages/finance/Invoice.tsx`
-- `src/pages/finance/NoteArchive.tsx`
-- `src/pages/Inventory.tsx`
-- `src/pages/inventory/ShoppingList.tsx`
-- `src/pages/inventory/MaterialControl.tsx`
-- `src/components/finance/FinanceStatsRecap.tsx`
-- `src/components/finance/OutletReportRecap.tsx`
-- `src/components/settings/AttendanceThresholdsTab.tsx`
-
-**Fetch outlets langsung — tambah `.neq('name','Manajemen')`**
-- `src/pages/Login.tsx` (signup form)
-- `src/pages/personalia/CheckIn.tsx` (Absen Selfie)
-- `src/pages/personalia/PerformanceReview.tsx`
-- `src/pages/Dashboard.tsx`
-
-**Tidak diubah**
-- Bagian admin kelola outlet di `Attendance.tsx` (sekitar baris 1267) — perlu lihat semua outlet termasuk Manajemen.
+## Tidak diubah
+- Skema database, RLS, dan logika simpan absen.
+- Halaman Rekap Absensi (`Attendance.tsx`) — itu sudah punya pemisahan tersendiri.
 
 ## Catatan
-- Filter berbasis nama persis `"Manajemen"`. Jika nama berubah, sesuaikan filter.
-- Tidak menambah kolom DB baru, tidak mengubah RLS.
+Filter berlaku hanya pada panel preview di halaman Absen Selfie milik user sendiri. Untuk rekap menyeluruh per outlet, pakai menu Rekap Absensi.
