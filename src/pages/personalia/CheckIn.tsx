@@ -68,12 +68,10 @@ export default function CheckInPage() {
   const [selectedShift, setSelectedShift] = useState<string>('Default');
 
   const canChooseOutlet = role === 'admin' || role === 'management';
-  const { shiftsForOutlet, shiftNames, resolve: resolveThresholds } = useAttendanceThresholds();
-  // Gabungkan shift outlet aktif + semua shift global, supaya selalu ada pilihan
-  // walau outlet user belum punya konfigurasi shift sendiri.
+  const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
+  // Shift hanya yang dikonfigurasi untuk outlet aktif (atau fallback global bawaan dari hook).
   const outletShifts = shiftsForOutlet(selectedOutletId);
-  const mergedShifts = Array.from(new Set([...(outletShifts || []), ...(shiftNames || []), 'Default']));
-  const availableShifts = mergedShifts.length > 0 ? mergedShifts : ['Default'];
+  const availableShifts = outletShifts.length > 0 ? outletShifts : ['Default'];
   const activeThresholds = resolveThresholds(selectedOutletId, selectedShift);
 
   // Realtime clock
@@ -241,12 +239,20 @@ export default function CheckInPage() {
   const outOfRadius = distance != null && distance > radius;
 
   const handleSubmit = async () => {
-    if (!user || !photoBlob || !coords) {
-      toast({ title: 'Data belum lengkap', description: 'Pastikan foto dan lokasi GPS sudah terdeteksi.', variant: 'destructive' });
+    if (!photoBlob || !photoPreview) {
+      toast({ title: 'Foto selfie wajib', description: 'Ambil foto selfie terlebih dahulu sebelum menyimpan absen.', variant: 'destructive' });
+      return;
+    }
+    if (!user || !coords) {
+      toast({ title: 'Data belum lengkap', description: 'Pastikan lokasi GPS sudah terdeteksi.', variant: 'destructive' });
       return;
     }
     if (canChooseOutlet && !selectedOutletId) {
       toast({ title: 'Pilih outlet dulu', description: 'Sebagai admin/management, pilih cabang tempat absen.', variant: 'destructive' });
+      return;
+    }
+    if (!selectedShift) {
+      toast({ title: 'Pilih shift dulu', description: 'Shift wajib dipilih agar status absen dapat dievaluasi.', variant: 'destructive' });
       return;
     }
     setSubmitting(true);
