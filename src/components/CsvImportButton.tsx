@@ -41,8 +41,8 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [parsed, setParsed] = useState<{ valid: TParsed[]; invalid: { row: number; raw: Record<string, string>; error: string }[] }>(
-    { valid: [], invalid: [] },
+  const [parsed, setParsed] = useState<{ valid: TParsed[]; invalid: { row: number; raw: Record<string, string>; error: string }[]; skipped: number }>(
+    { valid: [], invalid: [], skipped: 0 },
   );
   const [importing, setImporting] = useState(false);
 
