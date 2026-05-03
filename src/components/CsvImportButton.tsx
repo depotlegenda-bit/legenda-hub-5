@@ -154,6 +154,11 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
                 </div>
               </div>
             </div>
+            {parsed.skipped > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {parsed.skipped} baris kosong diabaikan (dipakai sebagai pemisah).
+              </p>
+            )}
 
             {parsed.invalid.length > 0 && (
               <div className="border rounded-md max-h-48 overflow-y-auto">
