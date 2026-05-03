@@ -63,14 +63,17 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
       }
       const valid: TParsed[] = [];
       const invalid: { row: number; raw: Record<string, string>; error: string }[] = [];
+      let skipped = 0;
       rawRows.forEach((raw, i) => {
         try {
-          valid.push(parseRow(raw, i));
+          const out = parseRow(raw, i);
+          if (out === undefined) skipped++;
+          else valid.push(out);
         } catch (e: any) {
           invalid.push({ row: i + 2, raw, error: e?.message || 'Invalid row' }); // +2 = header row + 1-indexed
         }
       });
-      setParsed({ valid, invalid });
+      setParsed({ valid, invalid, skipped });
       setOpen(true);
     } catch (e: any) {
       toast({ title: 'Gagal membaca file', description: e?.message, variant: 'destructive' });
