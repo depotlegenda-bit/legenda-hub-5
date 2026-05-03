@@ -755,7 +755,9 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
   const profileMap = useMemo(() => new Map(allProfiles.map((p) => [p.user_id, p])), [allProfiles]);
   const outletMap = useMemo(() => new Map(outlets.map((o) => [o.id, o.name])), [outlets]);
-  const filtered = userFilter === 'all' ? logs : logs.filter((l) => l.user_id === userFilter);
+  const filtered = logs
+    .filter((l) => userFilter === 'all' || l.user_id === userFilter)
+    .filter((l) => typeFilter === 'all' || l.log_type === typeFilter);
 
   const STATUS_OVERRIDE_OPTIONS: { key: string; label: string }[] = [
     { key: 'on_time', label: 'Tepat Waktu' },
