@@ -65,7 +65,7 @@ export default function CheckInPage() {
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
-  const [selectedShift, setSelectedShift] = useState<string>('Default');
+  const [selectedShift, setSelectedShift] = useState<string>('');
 
   const canChooseOutlet = role === 'admin' || role === 'management';
   const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
@@ -134,13 +134,10 @@ export default function CheckInPage() {
   };
   useEffect(() => { fetchRecent(); }, [user]);
 
-  // Pastikan shift terpilih selalu ada dalam daftar shift outlet aktif
+  // Reset shift saat outlet berubah agar user secara eksplisit memilih shift cabang yang aktif
   useEffect(() => {
-    if (availableShifts.length === 0) return;
-    if (!availableShifts.includes(selectedShift)) {
-      setSelectedShift(availableShifts[0]);
-    }
-  }, [availableShifts, selectedShift]);
+    setSelectedShift('');
+  }, [selectedOutletId]);
 
   // Start camera
   const startCamera = async () => {
@@ -384,8 +381,12 @@ export default function CheckInPage() {
             </Select>
             <p className="text-xs text-muted-foreground">
               Status terlambat / tepat waktu dihitung berdasarkan jam shift yang dipilih.
-              {' '}Jam shift <strong>{selectedShift}</strong>: masuk {activeThresholds.check_in_start.slice(0,5)}–{activeThresholds.check_in_late_after.slice(0,5)},
-              {' '}pulang {activeThresholds.check_out_earliest.slice(0,5)}–{activeThresholds.check_out_latest.slice(0,5)}.
+              {selectedShift ? (
+                <> Jam shift <strong>{selectedShift}</strong>: masuk {activeThresholds.check_in_start.slice(0,5)}–{activeThresholds.check_in_late_after.slice(0,5)},
+                {' '}pulang {activeThresholds.check_out_earliest.slice(0,5)}–{activeThresholds.check_out_latest.slice(0,5)}.</>
+              ) : (
+                <> Pilih shift terlebih dahulu — absen tidak dapat disimpan jika shift belum dipilih.</>
+              )}
             </p>
           </CardContent>
         </Card>
