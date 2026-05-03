@@ -65,7 +65,7 @@ export default function CheckInPage() {
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
-  const [selectedShift, setSelectedShift] = useState<string>('Default');
+  const [selectedShift, setSelectedShift] = useState<string>('');
 
   const canChooseOutlet = role === 'admin' || role === 'management';
   const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
