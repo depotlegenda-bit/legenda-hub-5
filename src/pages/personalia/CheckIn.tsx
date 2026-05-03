@@ -126,7 +126,7 @@ export default function CheckInPage() {
       .select('id, log_type, created_at, selfie_url, out_of_radius')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(20);
     if (data) {
       setRecentLogs(data as RecentLog[]);
       // Auto-suggest next log type
