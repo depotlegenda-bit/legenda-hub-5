@@ -100,7 +100,7 @@ export function CsvImportButton<TParsed>(props: CsvImportButtonProps<TParsed>) {
         });
       }
       setOpen(false);
-      setParsed({ valid: [], invalid: [] });
+      setParsed({ valid: [], invalid: [], skipped: 0 });
       onImported?.();
     } catch (e: any) {
       toast({ title: 'Import gagal', description: e?.message, variant: 'destructive' });
