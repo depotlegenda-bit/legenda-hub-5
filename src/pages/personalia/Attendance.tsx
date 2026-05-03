@@ -701,6 +701,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const [date, setDate] = usePersistentState<string>('attendance:logs:date', new Date().toISOString().split('T')[0]);
   const [userFilter, setUserFilter] = usePersistentState<string>('attendance:logs:userFilter', 'all');
   const [outletFilter, setOutletFilter] = usePersistentState<string>('attendance:logs:outletFilter', 'all');
+  const [typeFilter, setTypeFilter] = usePersistentState<'all' | 'check_in' | 'check_out'>('attendance:logs:typeFilter', 'all');
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [rolesByUser, setRolesByUser] = useState<Record<string, string[]>>({});
 
@@ -754,7 +755,9 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
   const profileMap = useMemo(() => new Map(allProfiles.map((p) => [p.user_id, p])), [allProfiles]);
   const outletMap = useMemo(() => new Map(outlets.map((o) => [o.id, o.name])), [outlets]);
-  const filtered = userFilter === 'all' ? logs : logs.filter((l) => l.user_id === userFilter);
+  const filtered = logs
+    .filter((l) => userFilter === 'all' || l.user_id === userFilter)
+    .filter((l) => typeFilter === 'all' || l.log_type === typeFilter);
 
   const STATUS_OVERRIDE_OPTIONS: { key: string; label: string }[] = [
     { key: 'on_time', label: 'Tepat Waktu' },
@@ -899,6 +902,26 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
 
         <div className="flex flex-wrap gap-2 items-center">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+          <div className="inline-flex rounded-md border border-input overflow-hidden">
+            {([
+              { v: 'all', l: 'Semua' },
+              { v: 'check_in', l: 'IN' },
+              { v: 'check_out', l: 'OUT' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setTypeFilter(opt.v)}
+                className={`px-3 h-10 text-sm transition-colors ${
+                  typeFilter === opt.v
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background hover:bg-accent'
+                }`}
+              >
+                {opt.l}
+              </button>
+            ))}
+          </div>
           <select
             value={userFilter}
             onChange={(e) => setUserFilter(e.target.value)}
