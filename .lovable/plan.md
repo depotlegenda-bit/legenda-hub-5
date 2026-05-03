@@ -1,109 +1,50 @@
-# Rencana: Marketing Content Command Center
+## Tujuan
+Outlet "Manajemen" hanya muncul sebagai opsi cabang di **3 tempat** saja:
+1. **Data Karyawan** (`StaffManagement.tsx`) — agar admin bisa assign staff manajemen
+2. **Profil Saya** (`Profile.tsx`) — tampil sebagai cabang user manajemen
+3. **Rekapan Absensi** (`personalia/Attendance.tsx`) — agar absen staff manajemen tetap bisa direkap terpisah
 
-Hanya halaman `/marketing/content-plan` (`src/pages/marketing/ContentPlan.tsx`) dan tabel `content_plans` yang akan disentuh. Routing, sidebar, dan modul lain tetap.
+Di **semua menu lain** (Dashboard, Absen Selfie, Finance, Inventory, Performance Review, Settings, signup, dll) outlet "Manajemen" **disembunyikan** dari dropdown / filter / rekap, supaya rekapan per-cabang tidak tercampur data manajemen.
 
-## 1. Migrasi Database (tabel `content_plans`)
+## Pendekatan
 
-Tambah kolom baru (semua nullable / default aman utk data lama):
+Tambah opsi `includeManagement` pada hook `useOutlets` (default `false`). Hook menyaring outlet bernama `"Manajemen"` (case-insensitive) dari list kecuali dipanggil `useOutlets({ includeManagement: true })`. Auto-select juga akan melewati Manajemen.
 
-- `content_type` text — enum app: `product_review`, `behind_the_scenes`, `promo`, `educational`, `user_story`
-- `pillar_title` text default `''`
-- `posted_url` text default `''`
-- `target_views` integer default 0
-- `target_leads` integer default 0
-- `engagement_saves` integer default 0
-- `engagement_link_clicks` integer default 0
+Untuk fetch outlets langsung tanpa hook, tambahkan filter `.neq('name', 'Manajemen')`.
 
-Update CHECK constraint `status`: `'idea','briefing','production','posted','archived'` (mapping data lama: `draft→briefing`, `in_progress→production`, `review→production`).
+## Perubahan File
 
-Tambah CHECK platform: `instagram, tiktok, youtube, linkedin, facebook, x, other`.
+**Hook**
+- `src/hooks/useOutlets.tsx` — tambah param `{ includeManagement?: boolean }`, filter "Manajemen" dari list & dari auto-select default.
 
-RLS, trigger, dan policy yang sudah ada tetap.
+**Sertakan Manajemen (pakai `includeManagement: true`)**
+- `src/pages/StaffManagement.tsx`
+- `src/pages/personalia/Attendance.tsx`
+- `src/pages/Profile.tsx` — hanya jika ada dropdown outlet; kalau cuma display `outlet_name` tidak perlu diubah
 
-## 2. Halaman Baru — `ContentPlan.tsx`
+**Sembunyikan Manajemen (default behavior, hanya verifikasi tidak pakai opsi include)**
+- `src/pages/Dashboard.tsx` (juga: tambah `.neq('name','Manajemen')` pada fetch langsungnya)
+- `src/pages/FinancialReport.tsx`
+- `src/pages/finance/DailyRecap.tsx`
+- `src/pages/finance/ProfitLoss.tsx`
+- `src/pages/finance/Invoice.tsx`
+- `src/pages/finance/NoteArchive.tsx`
+- `src/pages/Inventory.tsx`
+- `src/pages/inventory/ShoppingList.tsx`
+- `src/pages/inventory/MaterialControl.tsx`
+- `src/components/finance/FinanceStatsRecap.tsx`
+- `src/components/finance/OutletReportRecap.tsx`
+- `src/components/settings/AttendanceThresholdsTab.tsx`
 
-Layout penuh memakai `AppLayout`, container lebar (`max-w-7xl`). Struktur:
+**Fetch outlets langsung — tambah `.neq('name','Manajemen')`**
+- `src/pages/Login.tsx` (signup form)
+- `src/pages/personalia/CheckIn.tsx` (Absen Selfie)
+- `src/pages/personalia/PerformanceReview.tsx`
+- `src/pages/Dashboard.tsx`
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│ Header: "Marketing Content Command Center" + avatar user │
-├──────────────────────────────────────────────────────────┤
-│ Filter Bar: DateRange | Platform(multi) | Status(multi)  │
-│            | ContentType(multi) | Search                 │
-├──────────────────────────────────────────────────────────┤
-│ 4 Summary Cards (glassmorphism, teal #22C55E accent)     │
-│  • Total Spend + sparkline                               │
-│  • Avg Engagement Rate + bar per-platform                │
-│  • Content Distribution (donut per platform)             │
-│  • CPE Efficiency (min / avg / max)                      │
-├──────────────────────────────────────────────────────────┤
-│ Accordion: "➕ Add New Content Plan" (form lengkap)      │
-├──────────────────────────────────────────────────────────┤
-│ Batch Toolbar (muncul saat ada checkbox tercentang)      │
-│ Datatable Content Calendar                               │
-└──────────────────────────────────────────────────────────┘
-```
+**Tidak diubah**
+- Bagian admin kelola outlet di `Attendance.tsx` (sekitar baris 1267) — perlu lihat semua outlet termasuk Manajemen.
 
-### 2a. Filter Global
-- Date range pakai `Calendar` shadcn di dalam `Popover` (range mode).
-- Platform / Status / ContentType: dropdown multi-select (custom popover + `Checkbox` list, tanpa lib baru).
-- Search: input controlled, match `contentTitle` & `pillarTitle`.
-- Semua state lokal `useState`; hasil filter dipakai utk tabel + 4 widget summary.
-
-### 2b. Summary Widgets
-- Card `glass-card` + border teal tipis.
-- Pakai `recharts` (sudah dependency shadcn `chart`) untuk:
-  - Sparkline (LineChart mini) Total Spend per minggu.
-  - Bar mini per platform untuk engagement rate.
-  - Donut (PieChart) distribusi platform.
-- CPE = `rate_card / totalEngagement` (totalEng = likes+comments+saves+shares+views+linkClicks); tampilkan min/avg/max formatted Rupiah.
-
-### 2c. Form (Accordion)
-Pakai `Accordion` shadcn, judul "➕ Add New Content Plan", default closed.
-Field: Judul, Platform (7 opsi), Tanggal Jadwal, Status (5 opsi), Rate Card (Rupiah), Content Type, Pillar/Campaign Title, Posted URL, Target Views, Target Leads, Deskripsi.
-Tombol "Tambah" warna teal (`bg-[#22C55E] hover:bg-[#16A34A]`).
-
-### 2d. Datatable
-Build manual (tanpa lib baru) memakai `<table>` styled + sort state lokal. Kolom:
-
-1. Checkbox (bulk-select, header = select-all hasil filter)
-2. Scheduled Date — format `dd-MMM-yyyy` (`date-fns`)
-3. Title & Pillar (stack)
-4. Platform — ikon lucide (Instagram, Youtube, Facebook, Linkedin, Twitter, Music2 utk TikTok) + label
-5. Rate Card (Rupiah)
-6. Status — pill berwarna per status (Ide=gray, Briefing=blue, Production=amber, Posted=teal, Archived=muted)
-7. Update Status — `Select` quick dropdown
-8. Posted Link — ikon `ExternalLink` buka URL baru
-9. Engagement Metrics — stack icon+angka (Like/Comment/Save/Share/View/LinkClick) + tombol teal "Input Performance"
-10. CPE — Rupiah, warna teal kalau low (≤ avg×0.7), red kalau high (≥ avg×1.3)
-
-Alternating row colors (`even:bg-muted/30`). Sort header click pada Date / Rate Card / CPE.
-
-### 2e. Batch Toolbar
-Muncul sticky di atas tabel saat `selectedIds.length > 0`:
-- "Update Status → Posted"
-- "Archive Selected"
-- Tombol "Clear Selection"
-Eksekusi batch via `supabase.from('content_plans').update().in('id', ids)`.
-
-### 2f. Modal "Input Performance"
-`Dialog` full-width (max-w-2xl), grid input untuk: Likes, Comments, Saves, Shares, Views, Link Clicks. Tombol Simpan teal → update row + refresh.
-
-## 3. Permissions
-Tetap pakai `useAuth` + `useMenuPermissions` seperti versi lama (`canEdit`, `canManage`). Tidak mengubah role / RLS.
-
-## 4. Skema Warna
-- Primary aksen: `#22C55E` (teal-green) — tombol utama, highlight CPE bagus, header pill Posted.
-- Background section: existing `glass-card` + neutral putih/off-white sudah sesuai.
-- Status pill colors via `bg-*/15 text-*` Tailwind arbitrary.
-
-## 5. Detail Teknis
-- Tidak menambah dependency baru (recharts & date-fns sudah ada).
-- Mapping status lama saat fetch: jika `status='draft'` tampil sebagai `briefing`, `in_progress|review` → `production` (juga di-migrate sekali via SQL update).
-- `cpe_calc` dihitung di front-end, tidak disimpan.
-- Semua perhitungan summary memoized via `useMemo` agar instan saat filter berubah.
-
-## 6. Yang TIDAK Diubah
-- `App.tsx` routing, sidebar, menuRegistry.
-- Modul lain (inventory, finance, personalia, dll).
-- Auth, RLS policy, edge functions.
+## Catatan
+- Filter berbasis nama persis `"Manajemen"`. Jika nama berubah, sesuaikan filter.
+- Tidak menambah kolom DB baru, tidak mengubah RLS.

@@ -194,6 +194,7 @@ export default function DashboardPage() {
     supabase
       .from('outlets')
       .select('id, name')
+      .neq('name', 'Manajemen')
       .order('name')
       .then(({ data }) => {
         if (data) setOutlets(data);

@@ -7,6 +7,7 @@ interface Outlet {
 }
 
 const STORAGE_KEY = 'outlet:selected';
+const MANAGEMENT_NAME = 'manajemen';
 
 function readStored(): string {
   if (typeof window === 'undefined') return '';
@@ -17,7 +18,11 @@ function readStored(): string {
   }
 }
 
-export function useOutlets() {
+interface UseOutletsOptions {
+  includeManagement?: boolean;
+}
+
+export function useOutlets({ includeManagement = false }: UseOutletsOptions = {}) {
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [selectedOutlet, setSelectedOutletState] = useState<string>(() => readStored());
   const [loading, setLoading] = useState(true);
@@ -41,22 +46,24 @@ export function useOutlets() {
       .order('name')
       .then(({ data }) => {
         if (data) {
-          setOutlets(data);
+          const filtered = includeManagement
+            ? data
+            : data.filter((o) => o.name.trim().toLowerCase() !== MANAGEMENT_NAME);
+          setOutlets(filtered);
           const stored = readStored();
-          // Pakai pilihan tersimpan jika masih valid, jika tidak fallback ke yang pertama.
-          const validStored = stored && data.some((o) => o.id === stored) ? stored : '';
+          const validStored = stored && filtered.some((o) => o.id === stored) ? stored : '';
           if (validStored) {
             setSelectedOutletState(validStored);
-          } else if (!selectedOutlet && data.length > 0) {
-            setSelectedOutlet(data[0].id);
-          } else if (selectedOutlet && !data.some((o) => o.id === selectedOutlet) && data.length > 0) {
-            setSelectedOutlet(data[0].id);
+          } else if (!selectedOutlet && filtered.length > 0) {
+            setSelectedOutlet(filtered[0].id);
+          } else if (selectedOutlet && !filtered.some((o) => o.id === selectedOutlet) && filtered.length > 0) {
+            setSelectedOutlet(filtered[0].id);
           }
         }
         setLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [includeManagement]);
 
   return { outlets, selectedOutlet, setSelectedOutlet, loading };
 }
