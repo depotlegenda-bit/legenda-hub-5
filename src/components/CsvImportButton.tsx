@@ -23,8 +23,8 @@ export interface CsvImportButtonProps<TParsed> {
   templateFilename: string;
   /** Optional sample rows for the template */
   sampleRows?: (string | number)[][];
-  /** Validate/transform a row to the final shape; return the value or throw an Error */
-  parseRow: (row: Record<string, string>, index: number) => TParsed;
+  /** Validate/transform a row to the final shape; return the value, return undefined to skip the row, or throw an Error */
+  parseRow: (row: Record<string, string>, index: number) => TParsed | undefined;
   /** Called with all valid rows when user confirms import. Should perform the insert. */
   onImport: (rows: TParsed[]) => Promise<{ success: number; failed: number; message?: string }>;
   /** Called after successful import (e.g. to refresh data) */
