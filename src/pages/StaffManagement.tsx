@@ -40,7 +40,7 @@ const formatRupiah = (n: number) => `Rp ${Math.round(n || 0).toLocaleString('id-
 export default function StaffManagement() {
   const { toast } = useToast();
   const { role } = useAuth();
-  const { outlets } = useOutlets();
+  const { outlets } = useOutlets({ includeManagement: true });
   const [profiles, setProfiles] = useState<StaffProfile[]>([]);
   const [editProfile, setEditProfile] = useState<StaffProfile | null>(null);
   const [saving, setSaving] = useState(false);

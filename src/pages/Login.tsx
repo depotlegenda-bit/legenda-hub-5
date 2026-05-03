@@ -55,7 +55,7 @@ export default function Login() {
   useEffect(() => {
     if (!isSignUp) return;
     if (outlets.length > 0) return;
-    supabase.from('outlets').select('id, name').order('name').then(({ data }) => {
+    supabase.from('outlets').select('id, name').neq('name', 'Manajemen').order('name').then(({ data }) => {
       if (data) setOutlets(data);
     });
   }, [isSignUp, outlets.length]);

@@ -85,7 +85,7 @@ export default function PerformanceReviewPage() {
   useEffect(() => {
     (async () => {
       const [{ data: o }, { data: p }, { data: r }] = await Promise.all([
-        supabase.from('outlets').select('id, name').order('name'),
+        supabase.from('outlets').select('id, name').neq('name', 'Manajemen').order('name'),
         supabase.from('profiles').select('user_id, full_name, job_title, outlet_id').order('full_name'),
         supabase.from('performance_reviews').select('*').order('created_at', { ascending: false }).limit(200),
       ]);

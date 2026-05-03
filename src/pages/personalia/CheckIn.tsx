@@ -87,6 +87,7 @@ export default function CheckInPage() {
       const { data } = await supabase
         .from('outlets')
         .select('id, name, latitude, longitude, radius_meters')
+        .neq('name', 'Manajemen')
         .order('name');
       if (data) setAllOutlets(data as OutletOption[]);
     })();
