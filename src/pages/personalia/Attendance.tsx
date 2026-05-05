@@ -94,6 +94,25 @@ export default function AttendancePage() {
   const [rows, setRows] = useState<Record<string, RowState>>(attendanceDraft.value.rows);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [selfieLogsByUser, setSelfieLogsByUser] = useState<Record<string, SelfieLog[]>>({});
+  const { resolve: resolveThresholds } = useAttendanceThresholds();
+
+  const deriveFromSelfie = (logs: SelfieLog[]): Partial<RowState> | null => {
+    if (!logs || logs.length === 0) return null;
+    const ins = logs.filter((l) => l.log_type === 'check_in').sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const outs = logs.filter((l) => l.log_type === 'check_out').sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const firstIn = ins[0];
+    const lastOut = outs[outs.length - 1];
+    let lateMin = 0;
+    if (firstIn) {
+      const th = resolveThresholds(firstIn.outlet_id, firstIn.shift_name || 'Default');
+      const info = getAttendanceStatus(firstIn.created_at, 'check_in', th);
+      if (info.key === 'late') lateMin = Math.max(0, info.diffMinutes);
+    }
+    const fmt = (iso?: string) => iso ? format(new Date(iso), 'HH:mm') : '-';
+    const note = `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`;
+    return { status: 'H', late_minutes: lateMin, late_notes: note };
+  };
 
   // Fetch profiles once
   useEffect(() => {
