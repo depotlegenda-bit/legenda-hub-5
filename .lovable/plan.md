@@ -1,87 +1,43 @@
-# Template CSV Resep yang Lebih Mudah Dipahami
+## Tujuan
+Menghubungkan tab **Input Absensi** dengan **Log Absen Selfie** agar data kehadiran yang sudah di-submit lewat selfie (check-in/out) otomatis terisi di tabel Input Absensi — mengurangi input ganda dan menyamakan rekap.
 
-## Konteks Saat Ini
+## Cara kerja yang diusulkan
 
-Template CSV resep di **Kontrol Bahan Baku → Resep** sekarang punya format:
+Saat tab **Input Absensi** memuat data untuk `tanggal + outlet`, sistem akan:
+1. Tetap query `attendance` (data yang sudah pernah disimpan manual).
+2. Tambah query `attendance_logs` untuk tanggal + outlet yang sama, ambil semua log selfie hari itu.
+3. Untuk setiap karyawan, gabungkan log selfie-nya:
+   - **Check-in paling awal** → dipakai untuk menentukan status `H` (Hadir) dan menghitung **Terlambat (menit)** otomatis berdasarkan `attendance_thresholds` shift karyawan (`getAttendanceStatus` yg sudah dipakai di tab Logs).
+   - **Check-out paling akhir** → dicatat sebagai jam pulang (info di kolom keterangan).
+4. Jika baris belum punya `existingId` di `attendance` dan ada log selfie → row di-prefill (tidak otomatis dirty, tapi ditandai "dari selfie") sehingga PIC tinggal verifikasi & klik **Simpan**.
+5. Jika sudah ada record di `attendance` → tetap tampilkan badge kecil yang memberi tahu "ada X log selfie hari ini" + tombol "Sinkronkan dari selfie" untuk menimpa late_minutes & status berdasarkan log.
 
-```text
-menu_item_name, portions, ingredient_name, qty, unit
-Es Kopi Susu,   1,        Kopi,            18,  gram
-Es Kopi Susu,   1,        Susu,            150, ml
-Es Kopi Susu,   1,        Gula Aren,       30,  ml
-Nasi Goreng,    1,        Beras,           200, gram
-Nasi Goreng,    1,        Telur,           1,   butir
-```
+## Perubahan UI di tab Input Absensi
+- Kolom **Status Kehadiran**: tambahkan ikon kecil 📷 di samping tombol H bila row punya log selfie.
+- Kolom **Ket. Terlambat**: auto-prefill dengan teks `IN HH:mm · OUT HH:mm` (dari selfie) jika kosong.
+- Tombol baru di toolbar: **"Tarik dari Selfie"** — meng-apply hasil log selfie ke semua row outlet/tanggal terpilih sekaligus (status=H, late_minutes terhitung, keterangan jam IN/OUT).
+- Tooltip pada baris yang sudah disinkronkan: tampilkan jumlah log dan jam IN/OUT terdeteksi.
 
-Masalah untuk menu dengan banyak bahan:
-- Nama menu & porsi harus diulang di setiap baris (rawan typo → menu jadi pecah dua resep berbeda).
-- Tidak ada keterangan kolom / contoh / nomor bahan, pengguna bingung urutan.
-- Tidak ada baris pemisah antar menu, sulit dibaca di Excel saat menu punya 10+ bahan.
+## Detail teknis
+File yang diubah: `src/pages/personalia/Attendance.tsx`
 
-## Usulan Perbaikan
+1. Tambah state `selfieLogsByUser: Record<string, AttendanceLog[]>`.
+2. Di efek loader (sekitar baris 144–166), setelah query `attendance`, jalankan query paralel:
+   ```ts
+   supabase.from('attendance_logs')
+     .select('id,user_id,log_type,created_at,outlet_id')
+     .eq('outlet_id', selectedOutlet)
+     .gte('created_at', `${date}T00:00:00`)
+     .lte('created_at', `${date}T23:59:59`)
+   ```
+   Group by `user_id`.
+3. Buat helper `deriveFromSelfie(logs, profile)` yang mengembalikan `{ status:'H', late_minutes, late_notes }` memakai `useAttendanceThresholds().resolve(outletId, shiftName)` + `getAttendanceStatus` (sudah tersedia & dipakai di tab Logs).
+4. Saat membangun `map` row: jika tidak ada `rec` di `attendance` tapi ada logs → pakai hasil `deriveFromSelfie` sebagai default (dirty=false, tandai `fromSelfie:true`).
+5. Tambah tombol "Tarik dari Selfie": iterasi `outletProfiles`, untuk yang punya logs panggil `updateRow` dengan hasil derive (set dirty=true).
+6. Tambah indikator visual (ikon kecil + tooltip jumlah log).
+7. Tidak ada perubahan skema DB. Tidak ada perubahan RLS (PIC sudah punya akses `attendance_logs` outletnya).
 
-Tetap pakai format **1 baris per ingredient** (paling kompatibel dengan parser yang ada), tapi buat template jauh lebih ramah:
-
-### 1. Tambah kolom opsional `catatan` & header lebih deskriptif
-Header baru (urutan tetap, parser tetap pakai key lowercase):
-
-```text
-menu_item_name, portions, ingredient_name, qty, unit, catatan
-```
-
-- `catatan` opsional (diabaikan parser, hanya untuk pengguna). Berguna untuk tulis "bahan utama", "topping", dll.
-
-### 2. Sample rows lebih kaya & realistis
-Ganti contoh dengan 2 menu: 1 menu kopi sederhana + 1 menu makanan dengan banyak bahan, supaya pola "ulang nama menu" terlihat jelas.
-
-```text
-menu_item_name, portions, ingredient_name, qty, unit, catatan
-Es Kopi Susu,   1,        Espresso,         18,  gram, bahan utama
-Es Kopi Susu,   1,        Susu Full Cream,  150, ml,
-Es Kopi Susu,   1,        Gula Aren Cair,   30,  ml,
-Es Kopi Susu,   1,        Es Batu,          80,  gram, garnish
-,               ,         ,                 ,    ,     --- pemisah antar menu (baris kosong, abaikan) ---
-Nasi Goreng Spesial, 1,   Beras (matang),   200, gram, bahan utama
-Nasi Goreng Spesial, 1,   Telur Ayam,       1,   butir,
-Nasi Goreng Spesial, 1,   Bawang Merah,     10,  gram, bumbu
-Nasi Goreng Spesial, 1,   Bawang Putih,     5,   gram, bumbu
-Nasi Goreng Spesial, 1,   Cabai Rawit,      5,   gram, bumbu
-Nasi Goreng Spesial, 1,   Kecap Manis,      15,  ml,   bumbu
-Nasi Goreng Spesial, 1,   Minyak Goreng,    10,  ml,
-Nasi Goreng Spesial, 1,   Ayam Suwir,       50,  gram, topping
-Nasi Goreng Spesial, 1,   Daun Bawang,      5,   gram, garnish
-```
-
-Aturan yang dijelaskan ke pengguna lewat dialog:
-- 1 baris = 1 bahan.
-- Semua baris dengan `menu_item_name` sama digabung jadi 1 resep otomatis.
-- `portions` cukup ditulis sama di tiap baris menu yang sama (parser ambil dari baris pertama).
-- Baris kosong total akan diabaikan (boleh dipakai sebagai pemisah visual antar menu).
-
-### 3. Helper text & dialog preview lebih informatif
-- Update `helperText` di tombol import jadi panduan ringkas multi-baris (tampilkan aturan di atas).
-- Di `parseRow`, lewati baris yang seluruh kolomnya kosong (supaya pemisah visual aman).
-- Validasi tambahan: peringatkan kalau `portions` di baris-baris dengan menu sama tidak konsisten (pakai nilai pertama, tampilkan warning di dialog preview).
-
-### 4. Tambah panduan singkat di UI (di samping tombol Import CSV)
-Tooltip / teks kecil: "Format: 1 baris per bahan. Ulang nama menu di setiap bahannya. Lihat baris contoh di template."
-
-## Detail Teknis
-
-File yang disentuh:
-- `src/pages/inventory/MaterialControl.tsx`
-  - Tambah `'catatan'` ke `headers` & `sampleRows` (template).
-  - Perluas `sampleRows` jadi contoh menu dengan banyak bahan (minimal 8 ingredient).
-  - Update `parseRow`: skip baris kosong (`!menu && !ingName && !r.qty` → `return null`-style → lempar `Error('__SKIP__')` lalu filter di luar). Karena `CsvImportButton` tidak punya mekanisme skip, cara paling simpel: di `parseRow` lempar error khusus, tetapi itu masuk ke `invalid`. **Solusi yang lebih bersih**: tambahkan dukungan skip di `CsvImportButton` — jika `parseRow` mengembalikan `undefined`, baris di-skip (bukan error, bukan valid). Perubahan kecil & backward compatible.
-  - Update `helperText` jadi panduan multi-baris.
-- `src/components/CsvImportButton.tsx`
-  - Ubah signature `parseRow` agar boleh return `undefined` → baris diabaikan (tidak masuk valid maupun invalid).
-  - Tampilkan jumlah baris diabaikan di dialog preview (kecil, opsional).
-
-Tidak ada perubahan database / RLS.
-
-## Hasil Akhir untuk Pengguna
-
-- Saat klik **Template CSV** di Resep, file yang diunduh sudah berisi 2 contoh menu lengkap (termasuk menu dengan 9 bahan) + kolom `catatan` untuk anotasi.
-- Saat import, baris kosong sebagai pemisah visual antar menu tidak dianggap error.
-- Helper text & contoh membuat pengguna langsung paham pola "ulang nama menu di tiap baris bahan".
+## Yang TIDAK diubah
+- Tab Log Absen Selfie tetap seperti sekarang (filter All/IN/OUT yg sudah ditambahkan).
+- Karyawan dengan status I/S/C/L/T tetap diinput manual (selfie hanya menyentuh status H).
+- Tidak otomatis menyimpan ke DB — PIC tetap menekan "Simpan Absensi" untuk konfirmasi.
