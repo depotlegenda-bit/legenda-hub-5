@@ -171,28 +171,57 @@ export default function AttendancePage() {
     }
 
     const userIds = outletProfiles.map((p) => p.user_id);
-    supabase
-      .from('attendance')
-      .select('*')
-      .eq('attendance_date', date)
-      .in('user_id', userIds)
-      .then(({ data }) => {
-        const map: Record<string, RowState> = {};
-        outletProfiles.forEach((p) => {
-          const rec = data?.find((d: any) => d.user_id === p.user_id);
+    const [y, m, d] = date.split('-').map(Number);
+    const startLocal = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+    const endLocal = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+
+    Promise.all([
+      supabase.from('attendance').select('*').eq('attendance_date', date).in('user_id', userIds),
+      supabase
+        .from('attendance_logs')
+        .select('id,user_id,log_type,created_at,outlet_id,shift_name')
+        .eq('outlet_id', selectedOutlet)
+        .gte('created_at', startLocal.toISOString())
+        .lte('created_at', endLocal.toISOString())
+        .in('user_id', userIds),
+    ]).then(([attRes, logsRes]) => {
+      const data = attRes.data;
+      const logsByUser: Record<string, SelfieLog[]> = {};
+      (logsRes.data as SelfieLog[] | null || []).forEach((l) => {
+        if (!logsByUser[l.user_id]) logsByUser[l.user_id] = [];
+        logsByUser[l.user_id].push(l);
+      });
+      setSelfieLogsByUser(logsByUser);
+
+      const map: Record<string, RowState> = {};
+      outletProfiles.forEach((p) => {
+        const rec = data?.find((d: any) => d.user_id === p.user_id);
+        if (rec) {
           map[p.user_id] = {
-            status: rec ? (DB_TO_CODE[rec.status] || 'H') : 'H',
-            late_minutes: rec?.late_minutes ?? 0,
-            late_notes: rec?.late_notes ?? '',
-            cashbon_amount: Number(rec?.cashbon_amount ?? 0),
-            cashbon_notes: rec?.cashbon_notes ?? '',
-            existingId: rec?.id,
+            status: DB_TO_CODE[rec.status] || 'H',
+            late_minutes: rec.late_minutes ?? 0,
+            late_notes: rec.late_notes ?? '',
+            cashbon_amount: Number(rec.cashbon_amount ?? 0),
+            cashbon_notes: rec.cashbon_notes ?? '',
+            existingId: rec.id,
             dirty: false,
           };
-        });
-        setRows(map);
-        setSelected({});
+        } else {
+          const derived = deriveFromSelfie(logsByUser[p.user_id] || []);
+          map[p.user_id] = {
+            status: (derived?.status as StatusCode) || 'H',
+            late_minutes: derived?.late_minutes ?? 0,
+            late_notes: derived?.late_notes ?? '',
+            cashbon_amount: 0,
+            cashbon_notes: '',
+            dirty: false,
+            fromSelfie: !!derived,
+          };
+        }
       });
+      setRows(map);
+      setSelected({});
+    });
   }, [date, selectedOutlet, outletProfiles]);
 
   const updateRow = (uid: string, patch: Partial<RowState>) => {
