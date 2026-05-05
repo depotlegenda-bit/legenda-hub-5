@@ -365,6 +365,15 @@ export default function AttendancePage() {
                 <Button variant="outline" onClick={() => setDate(new Date().toISOString().split('T')[0])}>
                   Hari Ini
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={pullFromSelfie}
+                  disabled={selfieAvailableCount === 0}
+                  title="Isi otomatis status & terlambat dari log absen selfie"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Tarik dari Selfie {selfieAvailableCount > 0 && `(${selfieAvailableCount})`}
+                </Button>
                 <Button onClick={handleSave} disabled={saving || dirtyCount === 0}>
                   <Save className="w-4 h-4 mr-2" /> Simpan Absensi {dirtyCount > 0 && `(${dirtyCount})`}
                 </Button>
