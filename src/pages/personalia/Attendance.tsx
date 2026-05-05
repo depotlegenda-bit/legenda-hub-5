@@ -429,7 +429,23 @@ export default function AttendancePage() {
                               />
                             </td>
                             <td className="p-3 text-muted-foreground">{idx + 1}</td>
-                            <td className="p-3 font-medium">{p.full_name}</td>
+                            <td className="p-3 font-medium">
+                              <div className="flex items-center gap-2">
+                                <span>{p.full_name}</span>
+                                {(selfieLogsByUser[p.user_id]?.length ?? 0) > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                    title={`${selfieLogsByUser[p.user_id].length} log selfie hari ini`}
+                                  >
+                                    <Camera className="w-3 h-3" />
+                                    {selfieLogsByUser[p.user_id].length}
+                                  </span>
+                                )}
+                                {r.fromSelfie && !r.existingId && (
+                                  <span className="text-[10px] text-muted-foreground italic">prefilled</span>
+                                )}
+                              </div>
+                            </td>
                             <td className="p-3 text-muted-foreground">{p.job_title || '-'}</td>
                             <td className="p-3">
                               <div className="flex gap-1">
