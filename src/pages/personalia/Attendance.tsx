@@ -236,6 +236,28 @@ export default function AttendancePage() {
     setDate(d.toISOString().split('T')[0]);
   };
 
+  const selfieAvailableCount = Object.keys(selfieLogsByUser).filter((uid) => outletProfiles.some((p) => p.user_id === uid)).length;
+
+  const pullFromSelfie = () => {
+    const targets = Object.entries(selfieLogsByUser).filter(([uid]) => outletProfiles.some((p) => p.user_id === uid));
+    if (targets.length === 0) {
+      toast({ title: 'Tidak ada log selfie', description: 'Belum ada absen selfie untuk tanggal & outlet ini.' });
+      return;
+    }
+    let applied = 0;
+    setRows((prev) => {
+      const next = { ...prev };
+      targets.forEach(([uid, logs]) => {
+        const derived = deriveFromSelfie(logs);
+        if (!derived || !next[uid]) return;
+        next[uid] = { ...next[uid], ...derived, dirty: true, fromSelfie: true };
+        applied++;
+      });
+      return next;
+    });
+    toast({ title: 'Tertarik dari selfie', description: `${applied} karyawan diisi otomatis. Periksa lalu klik Simpan.` });
+  };
+
   const handleSave = async () => {
     const dirty = Object.entries(rows).filter(([, r]) => r.dirty);
     if (dirty.length === 0) {
