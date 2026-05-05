@@ -64,6 +64,16 @@ interface RowState {
   cashbon_notes: string;
   existingId?: string;
   dirty: boolean;
+  fromSelfie?: boolean;
+}
+
+interface SelfieLog {
+  id: string;
+  user_id: string;
+  log_type: 'check_in' | 'check_out';
+  created_at: string;
+  outlet_id: string | null;
+  shift_name?: string | null;
 }
 
 const createAttendanceDraft = () => ({
