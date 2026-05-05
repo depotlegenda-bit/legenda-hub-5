@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarCheck, ChevronLeft, ChevronRight, Save, MapPin, Plus, Crosshair, Trash2, AlertTriangle, Pencil } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Save, MapPin, Plus, Crosshair, Trash2, AlertTriangle, Pencil, Camera, Download } from 'lucide-react';
 import { useOutlets } from '@/hooks/useOutlets';
 import { useAuth, AppRole } from '@/hooks/useAuth';
 import { useTabParam } from '@/hooks/useTabParam';
