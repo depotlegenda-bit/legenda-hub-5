@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarCheck, ChevronLeft, ChevronRight, Save, MapPin, Plus, Crosshair, Trash2, AlertTriangle, Pencil } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Save, MapPin, Plus, Crosshair, Trash2, AlertTriangle, Pencil, Camera, Download } from 'lucide-react';
 import { useOutlets } from '@/hooks/useOutlets';
 import { useAuth, AppRole } from '@/hooks/useAuth';
 import { useTabParam } from '@/hooks/useTabParam';
@@ -64,6 +64,16 @@ interface RowState {
   cashbon_notes: string;
   existingId?: string;
   dirty: boolean;
+  fromSelfie?: boolean;
+}
+
+interface SelfieLog {
+  id: string;
+  user_id: string;
+  log_type: 'check_in' | 'check_out';
+  created_at: string;
+  outlet_id: string | null;
+  shift_name?: string | null;
 }
 
 const createAttendanceDraft = () => ({
@@ -84,6 +94,25 @@ export default function AttendancePage() {
   const [rows, setRows] = useState<Record<string, RowState>>(attendanceDraft.value.rows);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [selfieLogsByUser, setSelfieLogsByUser] = useState<Record<string, SelfieLog[]>>({});
+  const { resolve: resolveThresholds } = useAttendanceThresholds();
+
+  const deriveFromSelfie = (logs: SelfieLog[]): Partial<RowState> | null => {
+    if (!logs || logs.length === 0) return null;
+    const ins = logs.filter((l) => l.log_type === 'check_in').sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const outs = logs.filter((l) => l.log_type === 'check_out').sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const firstIn = ins[0];
+    const lastOut = outs[outs.length - 1];
+    let lateMin = 0;
+    if (firstIn) {
+      const th = resolveThresholds(firstIn.outlet_id, firstIn.shift_name || 'Default');
+      const info = getAttendanceStatus(firstIn.created_at, 'check_in', th);
+      if (info.key === 'late') lateMin = Math.max(0, info.diffMinutes);
+    }
+    const fmt = (iso?: string) => iso ? format(new Date(iso), 'HH:mm') : '-';
+    const note = `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`;
+    return { status: 'H', late_minutes: lateMin, late_notes: note };
+  };
 
   // Fetch profiles once
   useEffect(() => {
@@ -142,28 +171,57 @@ export default function AttendancePage() {
     }
 
     const userIds = outletProfiles.map((p) => p.user_id);
-    supabase
-      .from('attendance')
-      .select('*')
-      .eq('attendance_date', date)
-      .in('user_id', userIds)
-      .then(({ data }) => {
-        const map: Record<string, RowState> = {};
-        outletProfiles.forEach((p) => {
-          const rec = data?.find((d: any) => d.user_id === p.user_id);
+    const [y, m, d] = date.split('-').map(Number);
+    const startLocal = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+    const endLocal = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+
+    Promise.all([
+      supabase.from('attendance').select('*').eq('attendance_date', date).in('user_id', userIds),
+      supabase
+        .from('attendance_logs')
+        .select('id,user_id,log_type,created_at,outlet_id,shift_name')
+        .eq('outlet_id', selectedOutlet)
+        .gte('created_at', startLocal.toISOString())
+        .lte('created_at', endLocal.toISOString())
+        .in('user_id', userIds),
+    ]).then(([attRes, logsRes]) => {
+      const data = attRes.data;
+      const logsByUser: Record<string, SelfieLog[]> = {};
+      (logsRes.data as SelfieLog[] | null || []).forEach((l) => {
+        if (!logsByUser[l.user_id]) logsByUser[l.user_id] = [];
+        logsByUser[l.user_id].push(l);
+      });
+      setSelfieLogsByUser(logsByUser);
+
+      const map: Record<string, RowState> = {};
+      outletProfiles.forEach((p) => {
+        const rec = data?.find((d: any) => d.user_id === p.user_id);
+        if (rec) {
           map[p.user_id] = {
-            status: rec ? (DB_TO_CODE[rec.status] || 'H') : 'H',
-            late_minutes: rec?.late_minutes ?? 0,
-            late_notes: rec?.late_notes ?? '',
-            cashbon_amount: Number(rec?.cashbon_amount ?? 0),
-            cashbon_notes: rec?.cashbon_notes ?? '',
-            existingId: rec?.id,
+            status: DB_TO_CODE[rec.status] || 'H',
+            late_minutes: rec.late_minutes ?? 0,
+            late_notes: rec.late_notes ?? '',
+            cashbon_amount: Number(rec.cashbon_amount ?? 0),
+            cashbon_notes: rec.cashbon_notes ?? '',
+            existingId: rec.id,
             dirty: false,
           };
-        });
-        setRows(map);
-        setSelected({});
+        } else {
+          const derived = deriveFromSelfie(logsByUser[p.user_id] || []);
+          map[p.user_id] = {
+            status: (derived?.status as StatusCode) || 'H',
+            late_minutes: derived?.late_minutes ?? 0,
+            late_notes: derived?.late_notes ?? '',
+            cashbon_amount: 0,
+            cashbon_notes: '',
+            dirty: false,
+            fromSelfie: !!derived,
+          };
+        }
       });
+      setRows(map);
+      setSelected({});
+    });
   }, [date, selectedOutlet, outletProfiles]);
 
   const updateRow = (uid: string, patch: Partial<RowState>) => {
@@ -176,6 +234,28 @@ export default function AttendancePage() {
     const d = parseISO(date);
     d.setDate(d.getDate() + delta);
     setDate(d.toISOString().split('T')[0]);
+  };
+
+  const selfieAvailableCount = Object.keys(selfieLogsByUser).filter((uid) => outletProfiles.some((p) => p.user_id === uid)).length;
+
+  const pullFromSelfie = () => {
+    const targets = Object.entries(selfieLogsByUser).filter(([uid]) => outletProfiles.some((p) => p.user_id === uid));
+    if (targets.length === 0) {
+      toast({ title: 'Tidak ada log selfie', description: 'Belum ada absen selfie untuk tanggal & outlet ini.' });
+      return;
+    }
+    let applied = 0;
+    setRows((prev) => {
+      const next = { ...prev };
+      targets.forEach(([uid, logs]) => {
+        const derived = deriveFromSelfie(logs);
+        if (!derived || !next[uid]) return;
+        next[uid] = { ...next[uid], ...derived, dirty: true, fromSelfie: true };
+        applied++;
+      });
+      return next;
+    });
+    toast({ title: 'Tertarik dari selfie', description: `${applied} karyawan diisi otomatis. Periksa lalu klik Simpan.` });
   };
 
   const handleSave = async () => {
@@ -285,6 +365,15 @@ export default function AttendancePage() {
                 <Button variant="outline" onClick={() => setDate(new Date().toISOString().split('T')[0])}>
                   Hari Ini
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={pullFromSelfie}
+                  disabled={selfieAvailableCount === 0}
+                  title="Isi otomatis status & terlambat dari log absen selfie"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Tarik dari Selfie {selfieAvailableCount > 0 && `(${selfieAvailableCount})`}
+                </Button>
                 <Button onClick={handleSave} disabled={saving || dirtyCount === 0}>
                   <Save className="w-4 h-4 mr-2" /> Simpan Absensi {dirtyCount > 0 && `(${dirtyCount})`}
                 </Button>
@@ -340,7 +429,23 @@ export default function AttendancePage() {
                               />
                             </td>
                             <td className="p-3 text-muted-foreground">{idx + 1}</td>
-                            <td className="p-3 font-medium">{p.full_name}</td>
+                            <td className="p-3 font-medium">
+                              <div className="flex items-center gap-2">
+                                <span>{p.full_name}</span>
+                                {(selfieLogsByUser[p.user_id]?.length ?? 0) > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                    title={`${selfieLogsByUser[p.user_id].length} log selfie hari ini`}
+                                  >
+                                    <Camera className="w-3 h-3" />
+                                    {selfieLogsByUser[p.user_id].length}
+                                  </span>
+                                )}
+                                {r.fromSelfie && !r.existingId && (
+                                  <span className="text-[10px] text-muted-foreground italic">prefilled</span>
+                                )}
+                              </div>
+                            </td>
                             <td className="p-3 text-muted-foreground">{p.job_title || '-'}</td>
                             <td className="p-3">
                               <div className="flex gap-1">
