@@ -67,6 +67,16 @@ export default function CheckInPage() {
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
   const [selectedShift, setSelectedShift] = useState<string>('');
+  const [attendanceStatus, setAttendanceStatus] = useState<'H' | 'I' | 'S' | 'C' | 'L'>('H');
+
+  const STATUS_OPTIONS: { code: 'H' | 'I' | 'S' | 'C' | 'L'; label: string; cls: string }[] = [
+    { code: 'H', label: 'Hadir', cls: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 dark:text-emerald-400' },
+    { code: 'I', label: 'Izin',  cls: 'bg-blue-500/15 text-blue-700 border-blue-500/40 dark:text-blue-400' },
+    { code: 'S', label: 'Sakit', cls: 'bg-amber-500/15 text-amber-700 border-amber-500/40 dark:text-amber-400' },
+    { code: 'C', label: 'Cuti',  cls: 'bg-violet-500/15 text-violet-700 border-violet-500/40 dark:text-violet-400' },
+    { code: 'L', label: 'Libur', cls: 'bg-slate-500/15 text-slate-700 border-slate-500/40 dark:text-slate-300' },
+  ];
+  const isPresent = attendanceStatus === 'H';
 
   const canChooseOutlet = role === 'admin' || role === 'management';
   const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
@@ -265,10 +275,11 @@ export default function CheckInPage() {
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('attendance-selfies').getPublicUrl(filename);
 
+      const effectiveLogType = isPresent ? logType : 'check_in';
       const { error: insErr } = await (supabase as any).from('attendance_logs').insert({
         user_id: user.id,
         outlet_id: effectiveOutlet?.id || null,
-        log_type: logType,
+        log_type: effectiveLogType,
         shift_name: selectedShift || 'Default',
         selfie_url: publicUrl,
         latitude: coords.coords.latitude,
@@ -278,11 +289,16 @@ export default function CheckInPage() {
         out_of_radius: outOfRadius,
         device_info: navigator.userAgent.slice(0, 200),
         notes: notes || null,
+        status_override: attendanceStatus,
+        status_override_at: new Date().toISOString(),
+        status_override_by: user.id,
+        status_override_note: !isPresent ? (notes || STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label || null) : null,
       });
       if (insErr) throw insErr;
 
+      const statusLabel = STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label || 'Hadir';
       toast({
-        title: `${logType === 'check_in' ? 'Check-in' : 'Check-out'} berhasil!`,
+        title: isPresent ? `${logType === 'check_in' ? 'Check-in' : 'Check-out'} berhasil!` : `Absen ${statusLabel} tercatat`,
         description: outOfRadius ? '⚠️ Tercatat dengan flag di luar radius outlet.' : 'Absensi tersimpan.',
       });
       setPhotoBlob(null);
@@ -469,28 +485,75 @@ export default function CheckInPage() {
         {photoPreview && coords && (
           <Card className="glass-card">
             <CardContent className="p-4 space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  variant={logType === 'check_in' ? 'default' : 'outline'}
-                  onClick={() => setLogType('check_in')}
-                  className="flex-1 gap-2"
-                >
-                  <LogIn className="w-4 h-4" /> Check-In (Masuk)
-                </Button>
-                <Button
-                  variant={logType === 'check_out' ? 'default' : 'outline'}
-                  onClick={() => setLogType('check_out')}
-                  className="flex-1 gap-2"
-                >
-                  <LogOut className="w-4 h-4" /> Check-Out (Pulang)
-                </Button>
-              </div>
               <div className="space-y-2">
-                <Label>Catatan (opsional)</Label>
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Misal: izin ke bank, dll." rows={2} />
+                <Label>Status Kehadiran</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {STATUS_OPTIONS.map((s) => {
+                    const active = attendanceStatus === s.code;
+                    return (
+                      <button
+                        key={s.code}
+                        type="button"
+                        onClick={() => setAttendanceStatus(s.code)}
+                        className={
+                          'px-2 py-2 rounded-md border text-xs font-semibold transition-all ' +
+                          (active ? s.cls : 'border-border text-muted-foreground hover:bg-muted')
+                        }
+                      >
+                        <div className="font-bold text-sm">{s.code}</div>
+                        <div className="text-[10px]">{s.label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {!isPresent && (
+                  <p className="text-xs text-muted-foreground">
+                    Absen {STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label} — selfie & lokasi tetap dicatat sebagai bukti. Tulis alasan di catatan.
+                  </p>
+                )}
               </div>
-              <Button onClick={handleSubmit} disabled={submitting} className="w-full" size="lg">
-                {submitting ? 'Menyimpan...' : `Simpan ${logType === 'check_in' ? 'Check-In' : 'Check-Out'}`}
+
+              {isPresent && (
+                <div className="flex gap-2">
+                  <Button
+                    variant={logType === 'check_in' ? 'default' : 'outline'}
+                    onClick={() => setLogType('check_in')}
+                    className="flex-1 gap-2"
+                  >
+                    <LogIn className="w-4 h-4" /> Check-In (Masuk)
+                  </Button>
+                  <Button
+                    variant={logType === 'check_out' ? 'default' : 'outline'}
+                    onClick={() => setLogType('check_out')}
+                    className="flex-1 gap-2"
+                  >
+                    <LogOut className="w-4 h-4" /> Check-Out (Pulang)
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>
+                  Catatan {isPresent ? '(opsional)' : <span className="text-destructive">(wajib)</span>}
+                </Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={isPresent ? 'Misal: izin ke bank, dll.' : 'Tulis alasan / keterangan...'}
+                  rows={2}
+                />
+              </div>
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting || (!isPresent && !notes.trim())}
+                className="w-full"
+                size="lg"
+              >
+                {submitting
+                  ? 'Menyimpan...'
+                  : isPresent
+                    ? `Simpan ${logType === 'check_in' ? 'Check-In' : 'Check-Out'}`
+                    : `Simpan Absen ${STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label}`}
               </Button>
             </CardContent>
           </Card>

@@ -85,7 +85,7 @@ const createAttendanceDraft = () => ({
 export default function AttendancePage() {
   const { role } = useAuth();
   const canManageOutlets = role === 'management' || role === 'admin';
-  const [mainTab, setMainTab] = useTabParam('input');
+  const [mainTab, setMainTab] = useTabParam('recap');
   const { toast } = useToast();
   const { outlets, selectedOutlet, setSelectedOutlet, loading: outletsLoading } = useOutlets({ includeManagement: true });
   const attendanceDraft = usePersistentDraft('draft:attendance-input-v1', createAttendanceDraft());
@@ -322,204 +322,11 @@ export default function AttendancePage() {
 
         <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
           <TabsList>
-            <TabsTrigger value="input">Input Absensi</TabsTrigger>
             <TabsTrigger value="recap">Rekap Bulanan</TabsTrigger>
             <TabsTrigger value="logs">Log Absen Selfie</TabsTrigger>
             {canManageOutlets && <TabsTrigger value="outlets">Kelola Toko</TabsTrigger>}
           </TabsList>
 
-          <TabsContent value="input" className="space-y-4">
-            {/* Outlet tabs */}
-            <Tabs value={selectedOutlet} onValueChange={setSelectedOutlet}>
-              <TabsList className="flex-wrap gap-x-2 h-auto bg-transparent border-b border-border w-full justify-start rounded-none p-0">
-                {outlets.map((o) => (
-                  <TabsTrigger
-                    key={o.id}
-                    value={o.id}
-                    className="flex-none whitespace-normal text-left h-auto data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                  >
-                    {o.name}
-                  </TabsTrigger>
-                ))}
-                {outlets.length === 0 && !outletsLoading && (
-                  <span className="text-sm text-muted-foreground py-2 px-3">Belum ada outlet</span>
-                )}
-              </TabsList>
-            </Tabs>
-
-            {/* Date navigator */}
-            <div className="flex flex-wrap items-center gap-3 justify-between">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => shiftDate(-1)}>
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
-                <Button variant="outline" size="icon" onClick={() => shiftDate(1)}>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground ml-2">
-                  {format(parseISO(date), 'EEEE, d MMMM yyyy', { locale: idLocale })}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => setDate(new Date().toISOString().split('T')[0])}>
-                  Hari Ini
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={pullFromSelfie}
-                  disabled={selfieAvailableCount === 0}
-                  title="Isi otomatis status & terlambat dari log absen selfie"
-                >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Tarik dari Selfie {selfieAvailableCount > 0 && `(${selfieAvailableCount})`}
-                </Button>
-                <Button onClick={handleSave} disabled={saving || dirtyCount === 0}>
-                  <Save className="w-4 h-4 mr-2" /> Simpan Absensi {dirtyCount > 0 && `(${dirtyCount})`}
-                </Button>
-              </div>
-            </div>
-
-            {/* Bulk actions */}
-            {Object.values(selected).some(Boolean) && (
-              <div className="flex items-center gap-2 p-3 bg-muted/40 rounded-lg border border-border">
-                <span className="text-sm font-medium">Set status untuk {Object.values(selected).filter(Boolean).length} terpilih:</span>
-                {STATUS_DEFS.map((s) => (
-                  <button
-                    key={s.code}
-                    onClick={() => bulkSetStatus(s.code)}
-                    className={cn('px-2.5 py-1 rounded border text-xs font-bold', s.cls)}
-                    title={s.label}
-                  >
-                    {s.code}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <Card className="glass-card overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[1100px]">
-                    <thead className="bg-muted/40">
-                      <tr className="text-left text-xs uppercase text-muted-foreground">
-                        <th className="p-3 w-10">
-                          <Checkbox checked={allSelected} onCheckedChange={(c) => toggleAll(!!c)} />
-                        </th>
-                        <th className="p-3 w-10">No</th>
-                        <th className="p-3">Nama Karyawan</th>
-                        <th className="p-3">Jabatan</th>
-                        <th className="p-3">Status Kehadiran</th>
-                        <th className="p-3">Terlambat (menit)</th>
-                        <th className="p-3">Ket. Terlambat</th>
-                        <th className="p-3">Kasbon (Rp)</th>
-                        <th className="p-3">Ket. Kasbon</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {outletProfiles.map((p, idx) => {
-                        const r = rows[p.user_id];
-                        if (!r) return null;
-                        return (
-                          <tr key={p.user_id} className="border-t border-border/50 hover:bg-muted/20">
-                            <td className="p-3">
-                              <Checkbox
-                                checked={!!selected[p.user_id]}
-                                onCheckedChange={(c) => setSelected((s) => ({ ...s, [p.user_id]: !!c }))}
-                              />
-                            </td>
-                            <td className="p-3 text-muted-foreground">{idx + 1}</td>
-                            <td className="p-3 font-medium">
-                              <div className="flex items-center gap-2">
-                                <span>{p.full_name}</span>
-                                {(selfieLogsByUser[p.user_id]?.length ?? 0) > 0 && (
-                                  <span
-                                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                    title={`${selfieLogsByUser[p.user_id].length} log selfie hari ini`}
-                                  >
-                                    <Camera className="w-3 h-3" />
-                                    {selfieLogsByUser[p.user_id].length}
-                                  </span>
-                                )}
-                                {r.fromSelfie && !r.existingId && (
-                                  <span className="text-[10px] text-muted-foreground italic">prefilled</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3 text-muted-foreground">{p.job_title || '-'}</td>
-                            <td className="p-3">
-                              <div className="flex gap-1">
-                                {STATUS_DEFS.map((s) => {
-                                  const active = r.status === s.code;
-                                  return (
-                                    <button
-                                      key={s.code}
-                                      type="button"
-                                      onClick={() => updateRow(p.user_id, { status: s.code })}
-                                      className={cn(
-                                        'w-8 h-8 rounded border text-xs font-bold transition-all',
-                                        active ? s.cls : 'border-border text-muted-foreground hover:bg-muted'
-                                      )}
-                                      title={s.label}
-                                    >
-                                      {s.code}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <Input
-                                type="number"
-                                min={0}
-                                value={r.late_minutes}
-                                onChange={(e) => updateRow(p.user_id, { late_minutes: parseInt(e.target.value) || 0 })}
-                                className="w-20"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <Input
-                                value={r.late_notes}
-                                onChange={(e) => updateRow(p.user_id, { late_notes: e.target.value })}
-                                placeholder="Keterangan..."
-                                className="w-40"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <Input
-                                type="number"
-                                min={0}
-                                value={r.cashbon_amount}
-                                onChange={(e) => updateRow(p.user_id, { cashbon_amount: parseFloat(e.target.value) || 0 })}
-                                className="w-28"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <Input
-                                value={r.cashbon_notes}
-                                onChange={(e) => updateRow(p.user_id, { cashbon_notes: e.target.value })}
-                                placeholder="Keterangan..."
-                                className="w-40"
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {outletProfiles.length === 0 && (
-                        <tr>
-                          <td colSpan={9} className="p-8 text-center text-muted-foreground">
-                            {outlets.length === 0
-                              ? 'Belum ada outlet. Tambah outlet terlebih dahulu.'
-                              : 'Tidak ada karyawan di outlet ini. Atur outlet karyawan di menu Data Karyawan.'}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="recap">
             <RecapTab outletId={selectedOutlet} profiles={outletProfiles} role={role} />
@@ -572,7 +379,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
         .order('attendance_date', { ascending: false }),
       supabase
         .from('attendance_logs')
-        .select('id,user_id,log_type,created_at,outlet_id,shift_name')
+        .select('id,user_id,log_type,created_at,outlet_id,shift_name,status_override,status_override_note,notes')
         .gte('created_at', startLocal.toISOString())
         .lte('created_at', endLocal.toISOString())
         .in('user_id', userIds),
@@ -591,6 +398,12 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
       });
 
       // Buat virtual record dari log selfie untuk tanggal yang belum punya entri manual
+      const STATUS_FROM_OVERRIDE: Record<string, string> = {
+        H: 'hadir', I: 'izin', S: 'sakit', C: 'cuti', L: 'libur',
+      };
+      const STATUS_LABEL: Record<string, string> = {
+        H: 'Hadir', I: 'Izin', S: 'Sakit', C: 'Cuti', L: 'Libur',
+      };
       const virtual: any[] = [];
       Object.entries(logsByKey).forEach(([key, logs]) => {
         if (manualKeys.has(key)) return;
@@ -599,20 +412,34 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
         const outs = logs.filter((l) => l.log_type === 'check_out').sort((a, b) => a.created_at.localeCompare(b.created_at));
         const firstIn = ins[0];
         const lastOut = outs[outs.length - 1];
+
+        // Status diambil dari status_override pertama yang bukan 'H' (prioritaskan non-hadir),
+        // atau 'H' bila semua log H / tidak ada override.
+        const overrides = logs.map((l) => l.status_override).filter(Boolean) as string[];
+        const nonH = overrides.find((s) => s !== 'H');
+        const statusCode = nonH || overrides[0] || 'H';
+        const dbStatus = STATUS_FROM_OVERRIDE[statusCode] || 'hadir';
+        const isPresent = statusCode === 'H';
+
         let lateMin = 0;
-        if (firstIn) {
+        if (isPresent && firstIn) {
           const th = resolveThresholds(firstIn.outlet_id, firstIn.shift_name || 'Default');
           const info = getAttendanceStatus(firstIn.created_at, 'check_in', th);
           if (info.key === 'late') lateMin = Math.max(0, info.diffMinutes);
         }
         const fmt = (iso?: string) => iso ? format(new Date(iso), 'HH:mm') : '-';
+        const userNote = logs.map((l) => l.status_override_note || l.notes).filter(Boolean)[0] || '';
+        const lateNotes = isPresent
+          ? `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`
+          : `${STATUS_LABEL[statusCode] || statusCode}${userNote ? ` — ${userNote}` : ''}`;
+
         virtual.push({
           id: `selfie-${key}`,
           user_id,
           attendance_date,
-          status: 'hadir',
+          status: dbStatus,
           late_minutes: lateMin,
-          late_notes: `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`,
+          late_notes: lateNotes,
           cashbon_amount: 0,
           cashbon_notes: '',
           _auto: true,
@@ -760,7 +587,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
             <Camera className="w-5 h-5 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div className="text-sm">
               <p className="font-medium text-emerald-800 dark:text-emerald-300">{autoCount} kehadiran terisi otomatis dari Absen Selfie</p>
-              <p className="text-xs text-muted-foreground">Status H &amp; menit terlambat dihitung dari log selfie tanpa perlu input manual. Bila ingin mengoreksi (mis. menambah kasbon), buka tab Input Absensi dan simpan.</p>
+              <p className="text-xs text-muted-foreground">Status dan menit terlambat dihitung otomatis dari Log Absen Selfie — termasuk status Izin / Sakit / Cuti / Libur yang dipilih crew saat absen.</p>
             </div>
           </div>
         )}
