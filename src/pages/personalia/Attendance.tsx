@@ -360,6 +360,52 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
   const [loading, setLoading] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<number>(0);
+  const [editNotes, setEditNotes] = useState<string>('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const startEditLate = (rec: any | null, ds: string) => {
+    setEditingDate(ds);
+    setEditValue(rec?.late_minutes || 0);
+    setEditNotes(rec?.late_notes || '');
+  };
+
+  const saveEditLate = async (ds: string) => {
+    if (!detailUserId) return;
+    setEditSaving(true);
+    const rec = records.find((r) => r.user_id === detailUserId && r.attendance_date === ds);
+    let error: any = null;
+    if (rec && !rec._auto) {
+      const res = await supabase
+        .from('attendance')
+        .update({ late_minutes: editValue, late_notes: editNotes })
+        .eq('id', rec.id);
+      error = res.error;
+    } else {
+      // Insert override (untuk virtual selfie atau hari kosong)
+      const payload = {
+        user_id: detailUserId,
+        outlet_id: outletId,
+        attendance_date: ds,
+        status: rec?.status || 'hadir',
+        late_minutes: editValue,
+        late_notes: editNotes,
+        cashbon_amount: rec?.cashbon_amount || 0,
+        cashbon_notes: rec?.cashbon_notes || '',
+      };
+      const res = await supabase.from('attendance').insert(payload);
+      error = res.error;
+    }
+    setEditSaving(false);
+    if (error) {
+      toast({ title: 'Gagal menyimpan', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Terlambat diperbarui' });
+    setEditingDate(null);
+    reload();
+  };
 
   const reload = () => {
     if (!outletId || profiles.length === 0) { setRecords([]); setAutoCount(0); return; }
@@ -747,6 +793,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
                           <th className="p-2">Status</th>
                           <th className="p-2 text-right">Terlambat</th>
                           <th className="p-2">Keterangan</th>
+                          {isAdmin && <th className="p-2 text-right">Aksi</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -754,6 +801,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
                           const dObj = parseISO(ds);
                           const code = rec ? (DB_TO_CODE[rec.status] || '-') : '–';
                           const def = STATUS_DEFS.find((s) => s.code === code);
+                          const isEditing = isAdmin && editingDate === ds;
                           return (
                             <tr key={ds} className="border-t border-border/50">
                               <td className="p-2 font-mono text-xs">{format(dObj, 'dd MMM', { locale: idLocale })}</td>
@@ -772,8 +820,47 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
                                   </span>
                                 )}
                               </td>
-                              <td className="p-2 text-right text-xs">{rec ? `${rec.late_minutes || 0} mnt` : '-'}</td>
-                              <td className="p-2 text-xs text-muted-foreground">{rec?.late_notes || rec?.notes || ''}</td>
+                              <td className="p-2 text-right text-xs">
+                                {isEditing ? (
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(parseInt(e.target.value) || 0)}
+                                    className="h-7 w-20 ml-auto text-right"
+                                  />
+                                ) : (
+                                  rec ? `${rec.late_minutes || 0} mnt` : '-'
+                                )}
+                              </td>
+                              <td className="p-2 text-xs text-muted-foreground">
+                                {isEditing ? (
+                                  <Input
+                                    value={editNotes}
+                                    onChange={(e) => setEditNotes(e.target.value)}
+                                    placeholder="Catatan mitigasi"
+                                    className="h-7 text-xs"
+                                  />
+                                ) : (
+                                  rec?.late_notes || rec?.notes || ''
+                                )}
+                              </td>
+                              {isAdmin && (
+                                <td className="p-2 text-right">
+                                  {isEditing ? (
+                                    <div className="flex gap-1 justify-end">
+                                      <Button size="sm" variant="ghost" onClick={() => setEditingDate(null)} disabled={editSaving}>Batal</Button>
+                                      <Button size="sm" onClick={() => saveEditLate(ds)} disabled={editSaving}>
+                                        {editSaving ? '...' : 'Simpan'}
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Button size="sm" variant="ghost" onClick={() => startEditLate(rec, ds)} title="Edit terlambat">
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
