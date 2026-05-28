@@ -265,6 +265,10 @@ export default function CheckInPage() {
       toast({ title: 'Pilih shift dulu', description: 'Shift wajib dipilih agar status absen dapat dievaluasi.', variant: 'destructive' });
       return;
     }
+    if (!isPresent && !notes.trim()) {
+      toast({ title: 'Catatan wajib diisi', description: `Status ${STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label} harus disertai alasan/keterangan.`, variant: 'destructive' });
+      return;
+    }
     setSubmitting(true);
     try {
       const filename = `${user.id}/${Date.now()}.jpg`;
