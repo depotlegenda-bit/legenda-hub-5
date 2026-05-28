@@ -360,6 +360,52 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
   const [loading, setLoading] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<number>(0);
+  const [editNotes, setEditNotes] = useState<string>('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const startEditLate = (rec: any | null, ds: string) => {
+    setEditingDate(ds);
+    setEditValue(rec?.late_minutes || 0);
+    setEditNotes(rec?.late_notes || '');
+  };
+
+  const saveEditLate = async (ds: string) => {
+    if (!detailUserId) return;
+    setEditSaving(true);
+    const rec = records.find((r) => r.user_id === detailUserId && r.attendance_date === ds);
+    let error: any = null;
+    if (rec && !rec._auto) {
+      const res = await supabase
+        .from('attendance')
+        .update({ late_minutes: editValue, late_notes: editNotes })
+        .eq('id', rec.id);
+      error = res.error;
+    } else {
+      // Insert override (untuk virtual selfie atau hari kosong)
+      const payload = {
+        user_id: detailUserId,
+        outlet_id: outletId,
+        attendance_date: ds,
+        status: rec?.status || 'hadir',
+        late_minutes: editValue,
+        late_notes: editNotes,
+        cashbon_amount: rec?.cashbon_amount || 0,
+        cashbon_notes: rec?.cashbon_notes || '',
+      };
+      const res = await supabase.from('attendance').insert(payload);
+      error = res.error;
+    }
+    setEditSaving(false);
+    if (error) {
+      toast({ title: 'Gagal menyimpan', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Terlambat diperbarui' });
+    setEditingDate(null);
+    reload();
+  };
 
   const reload = () => {
     if (!outletId || profiles.length === 0) { setRecords([]); setAutoCount(0); return; }
