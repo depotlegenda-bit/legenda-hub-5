@@ -520,33 +520,10 @@ export default function CheckInPage() {
         {photoPreview && coords && (
           <Card className="glass-card">
             <CardContent className="p-4 space-y-4">
-              <div className="space-y-2">
-                <Label>Status Kehadiran</Label>
-                <div className="grid grid-cols-5 gap-2">
-                  {STATUS_OPTIONS.map((s) => {
-                    const active = attendanceStatus === s.code;
-                    return (
-                      <button
-                        key={s.code}
-                        type="button"
-                        onClick={() => setAttendanceStatus(s.code)}
-                        className={
-                          'px-2 py-2 rounded-md border text-xs font-semibold transition-all ' +
-                          (active ? s.cls : 'border-border text-muted-foreground hover:bg-muted')
-                        }
-                      >
-                        <div className="font-bold text-sm">{s.code}</div>
-                        <div className="text-[10px]">{s.label}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {!isPresent && (
-                  <p className="text-xs text-muted-foreground">
-                    Absen {STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label} — selfie & lokasi tetap dicatat sebagai bukti. Tulis alasan di catatan.
-                  </p>
-                )}
+              <div className="text-xs text-muted-foreground">
+                Status terpilih: <strong>{STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label}</strong>
               </div>
+
 
               {isPresent && (
                 <div className="flex gap-2">
