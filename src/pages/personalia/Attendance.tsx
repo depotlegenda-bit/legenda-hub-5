@@ -603,7 +603,17 @@ function RecapTab({
     <Card className="glass-card">
       <CardContent className="p-4 space-y-4">
         <div className="flex flex-wrap gap-2 items-center justify-between">
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
+            <Select value={selectedOutlet} onValueChange={setSelectedOutlet} disabled={outletsLoading}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Pilih cabang" />
+              </SelectTrigger>
+              <SelectContent>
+                {outlets.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input type="number" min={1} max={12} value={month} onChange={(e) => setMonth(parseInt(e.target.value) || 1)} className="w-20" />
             <Input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value) || year)} className="w-28" />
             <span className="text-sm text-muted-foreground">{periodLabel}</span>
