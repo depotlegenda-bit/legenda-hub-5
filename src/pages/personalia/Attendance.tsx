@@ -543,30 +543,87 @@ export default function AttendancePage() {
 function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Profile[]; role: AppRole | null }) {
   const { toast } = useToast();
   const isAdmin = role === 'admin';
+  const { resolve: resolveThresholds } = useAttendanceThresholds();
   const now = new Date();
   const [month, setMonth] = usePersistentState<number>('attendance:recap:month', now.getMonth() + 1);
   const [year, setYear] = usePersistentState<number>('attendance:recap:year', now.getFullYear());
   const [records, setRecords] = useState<any[]>([]);
+  const [autoCount, setAutoCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
 
   const reload = () => {
-    if (!outletId || profiles.length === 0) { setRecords([]); return; }
+    if (!outletId || profiles.length === 0) { setRecords([]); setAutoCount(0); return; }
     setLoading(true);
     const start = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = new Date(year, month, 0).getDate();
     const end = `${year}-${String(month).padStart(2, '0')}-${String(endDate).padStart(2, '0')}`;
-    supabase
-      .from('attendance')
-      .select('*')
-      .gte('attendance_date', start)
-      .lte('attendance_date', end)
-      .in('user_id', profiles.map((p) => p.user_id))
-      .order('attendance_date', { ascending: false })
-      .then(({ data }) => {
-        setRecords(data || []);
-        setLoading(false);
+    const userIds = profiles.map((p) => p.user_id);
+    const startLocal = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const endLocal = new Date(year, month - 1, endDate, 23, 59, 59, 999);
+
+    Promise.all([
+      supabase
+        .from('attendance')
+        .select('*')
+        .gte('attendance_date', start)
+        .lte('attendance_date', end)
+        .in('user_id', userIds)
+        .order('attendance_date', { ascending: false }),
+      supabase
+        .from('attendance_logs')
+        .select('id,user_id,log_type,created_at,outlet_id,shift_name')
+        .gte('created_at', startLocal.toISOString())
+        .lte('created_at', endLocal.toISOString())
+        .in('user_id', userIds),
+    ]).then(([attRes, logsRes]) => {
+      const manual = (attRes.data || []) as any[];
+      const manualKeys = new Set(manual.map((r) => `${r.user_id}__${r.attendance_date}`));
+
+      // Group log selfie per user_id + tanggal lokal
+      const logsByKey: Record<string, any[]> = {};
+      (logsRes.data || []).forEach((l: any) => {
+        const d = new Date(l.created_at);
+        const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const key = `${l.user_id}__${localDate}`;
+        if (!logsByKey[key]) logsByKey[key] = [];
+        logsByKey[key].push(l);
       });
+
+      // Buat virtual record dari log selfie untuk tanggal yang belum punya entri manual
+      const virtual: any[] = [];
+      Object.entries(logsByKey).forEach(([key, logs]) => {
+        if (manualKeys.has(key)) return;
+        const [user_id, attendance_date] = key.split('__');
+        const ins = logs.filter((l) => l.log_type === 'check_in').sort((a, b) => a.created_at.localeCompare(b.created_at));
+        const outs = logs.filter((l) => l.log_type === 'check_out').sort((a, b) => a.created_at.localeCompare(b.created_at));
+        const firstIn = ins[0];
+        const lastOut = outs[outs.length - 1];
+        let lateMin = 0;
+        if (firstIn) {
+          const th = resolveThresholds(firstIn.outlet_id, firstIn.shift_name || 'Default');
+          const info = getAttendanceStatus(firstIn.created_at, 'check_in', th);
+          if (info.key === 'late') lateMin = Math.max(0, info.diffMinutes);
+        }
+        const fmt = (iso?: string) => iso ? format(new Date(iso), 'HH:mm') : '-';
+        virtual.push({
+          id: `selfie-${key}`,
+          user_id,
+          attendance_date,
+          status: 'hadir',
+          late_minutes: lateMin,
+          late_notes: `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`,
+          cashbon_amount: 0,
+          cashbon_notes: '',
+          _auto: true,
+        });
+      });
+
+      const merged = [...manual, ...virtual].sort((a, b) => (b.attendance_date || '').localeCompare(a.attendance_date || ''));
+      setRecords(merged);
+      setAutoCount(virtual.length);
+      setLoading(false);
+    });
   };
 
   useEffect(() => { reload(); }, [outletId, month, year, profiles]);
@@ -698,6 +755,17 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
           </div>
         )}
 
+        {autoCount > 0 && (
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10">
+            <Camera className="w-5 h-5 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-emerald-800 dark:text-emerald-300">{autoCount} kehadiran terisi otomatis dari Absen Selfie</p>
+              <p className="text-xs text-muted-foreground">Status H &amp; menit terlambat dihitung dari log selfie tanpa perlu input manual. Bila ingin mengoreksi (mis. menambah kasbon), buka tab Input Absensi dan simpan.</p>
+            </div>
+          </div>
+        )}
+
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -755,39 +823,52 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
                     const dupKey = `${r.user_id}__${r.attendance_date}`;
                     const isDup = duplicateGroups.some((g) => g[0] && `${g[0].user_id}__${g[0].attendance_date}` === dupKey);
                     return (
-                      <tr key={r.id} className={cn('border-t border-border/50 hover:bg-muted/20', isDup && 'bg-destructive/5')}>
+                      <tr key={r.id} className={cn('border-t border-border/50 hover:bg-muted/20', isDup && 'bg-destructive/5', r._auto && 'bg-emerald-500/5')}>
                         <td className="p-3 font-mono text-xs">{r.attendance_date}</td>
                         <td className="p-3">
-                          <div className="font-medium">{prof?.full_name || '—'}</div>
+                          <div className="font-medium flex items-center gap-1.5">
+                            {prof?.full_name || '—'}
+                            {r._auto && (
+                              <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded">
+                                <Camera className="w-3 h-3" /> Selfie
+                              </span>
+                            )}
+                          </div>
                           {isDup && <span className="text-[10px] uppercase font-bold text-destructive">Duplikat</span>}
+                          {r._auto && r.late_notes && <div className="text-[10px] text-muted-foreground mt-0.5">{r.late_notes}</div>}
                         </td>
                         <td className="p-3"><span className="text-xs font-bold">{DB_TO_CODE[r.status] || r.status}</span></td>
                         <td className="p-3 text-right">{r.late_minutes || 0} mnt</td>
                         <td className="p-3 text-right">Rp {Number(r.cashbon_amount || 0).toLocaleString('id-ID')}</td>
                         <td className="p-3 text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Hapus entri absen?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  {prof?.full_name} · {r.attendance_date} · {DB_TO_CODE[r.status] || r.status}. Tindakan ini tidak dapat dibatalkan.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Batal</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOne(r.id)}>Hapus</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {r._auto ? (
+                            <span className="text-[10px] text-muted-foreground italic">Otomatis</span>
+                          ) : (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Hapus entri absen?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {prof?.full_name} · {r.attendance_date} · {DB_TO_CODE[r.status] || r.status}. Tindakan ini tidak dapat dibatalkan.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Batal</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteOne(r.id)}>Hapus</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
+
                 </tbody>
               </table>
             </div>
