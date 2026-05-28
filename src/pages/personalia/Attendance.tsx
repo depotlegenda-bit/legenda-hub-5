@@ -587,7 +587,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
             <Camera className="w-5 h-5 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div className="text-sm">
               <p className="font-medium text-emerald-800 dark:text-emerald-300">{autoCount} kehadiran terisi otomatis dari Absen Selfie</p>
-              <p className="text-xs text-muted-foreground">Status H &amp; menit terlambat dihitung dari log selfie tanpa perlu input manual. Bila ingin mengoreksi (mis. menambah kasbon), buka tab Input Absensi dan simpan.</p>
+              <p className="text-xs text-muted-foreground">Status dan menit terlambat dihitung otomatis dari Log Absen Selfie — termasuk status Izin / Sakit / Cuti / Libur yang dipilih crew saat absen.</p>
             </div>
           </div>
         )}
