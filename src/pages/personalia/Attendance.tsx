@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 type StatusCode = 'H' | 'I' | 'S' | 'C' | 'L' | 'T';
 
@@ -358,6 +359,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
   const [autoCount, setAutoCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
 
   const reload = () => {
     if (!outletId || profiles.length === 0) { setRecords([]); setAutoCount(0); return; }
@@ -476,6 +478,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
     const totalLate = recs.reduce((s, r) => s + (r.late_minutes || 0), 0);
     const totalCashbon = recs.reduce((s, r) => s + Number(r.cashbon_amount || 0), 0);
     return {
+      user_id: p.user_id,
       name: p.full_name,
       H: count('hadir'), I: count('izin'), S: count('sakit'),
       C: count('cuti'), L: count('libur'), T: count('alpha'),
@@ -608,7 +611,16 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
             <tbody>
               {summary.map((s) => (
                 <tr key={s.name} className="border-b border-border/50">
-                  <td className="p-3 font-medium">{s.name}</td>
+                  <td className="p-3 font-medium">
+                    <button
+                      type="button"
+                      onClick={() => setDetailUserId(s.user_id)}
+                      className="text-left hover:text-primary hover:underline focus:outline-none focus:text-primary"
+                      title="Lihat detail absensi bulan ini"
+                    >
+                      {s.name}
+                    </button>
+                  </td>
                   <td className="p-3 text-center">{s.H}</td>
                   <td className="p-3 text-center">{s.I}</td>
                   <td className="p-3 text-center">{s.S}</td>
@@ -701,6 +713,78 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
             </div>
           </div>
         )}
+
+        <Dialog open={!!detailUserId} onOpenChange={(o) => !o && setDetailUserId(null)}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            {(() => {
+              if (!detailUserId) return null;
+              const prof = profileMap.get(detailUserId);
+              const today = new Date();
+              const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
+              const lastDay = isCurrentMonth ? today.getDate() : new Date(year, month, 0).getDate();
+              const userRecs = records.filter((r) => r.user_id === detailUserId);
+              const byDate = new Map<string, any>();
+              userRecs.forEach((r) => { byDate.set(r.attendance_date, r); });
+              const days: { date: string; rec: any | null }[] = [];
+              for (let d = 1; d <= lastDay; d++) {
+                const ds = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                days.push({ date: ds, rec: byDate.get(ds) || null });
+              }
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{prof?.full_name || 'Karyawan'}</DialogTitle>
+                    <DialogDescription>
+                      Detail absensi {periodLabel} — 1 s/d {lastDay} {isCurrentMonth ? '(bulan berjalan)' : ''}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="overflow-x-auto rounded-lg border border-border mt-2">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40">
+                        <tr className="text-left text-xs uppercase text-muted-foreground">
+                          <th className="p-2">Tanggal</th>
+                          <th className="p-2">Hari</th>
+                          <th className="p-2">Status</th>
+                          <th className="p-2 text-right">Terlambat</th>
+                          <th className="p-2">Keterangan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {days.map(({ date: ds, rec }) => {
+                          const dObj = parseISO(ds);
+                          const code = rec ? (DB_TO_CODE[rec.status] || '-') : '–';
+                          const def = STATUS_DEFS.find((s) => s.code === code);
+                          return (
+                            <tr key={ds} className="border-t border-border/50">
+                              <td className="p-2 font-mono text-xs">{format(dObj, 'dd MMM', { locale: idLocale })}</td>
+                              <td className="p-2 text-xs text-muted-foreground">{format(dObj, 'EEEE', { locale: idLocale })}</td>
+                              <td className="p-2">
+                                {rec ? (
+                                  <span className={cn('inline-flex items-center px-2 py-0.5 rounded border text-xs font-bold', def?.cls)}>
+                                    {code} · {def?.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Belum absen</span>
+                                )}
+                                {rec?._auto && (
+                                  <span className="ml-1 inline-flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">
+                                    <Camera className="w-3 h-3" />
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2 text-right text-xs">{rec ? `${rec.late_minutes || 0} mnt` : '-'}</td>
+                              <td className="p-2 text-xs text-muted-foreground">{rec?.late_notes || rec?.notes || ''}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
