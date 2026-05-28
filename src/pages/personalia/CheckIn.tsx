@@ -67,6 +67,16 @@ export default function CheckInPage() {
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
   const [selectedShift, setSelectedShift] = useState<string>('');
+  const [attendanceStatus, setAttendanceStatus] = useState<'H' | 'I' | 'S' | 'C' | 'L'>('H');
+
+  const STATUS_OPTIONS: { code: 'H' | 'I' | 'S' | 'C' | 'L'; label: string; cls: string }[] = [
+    { code: 'H', label: 'Hadir', cls: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 dark:text-emerald-400' },
+    { code: 'I', label: 'Izin',  cls: 'bg-blue-500/15 text-blue-700 border-blue-500/40 dark:text-blue-400' },
+    { code: 'S', label: 'Sakit', cls: 'bg-amber-500/15 text-amber-700 border-amber-500/40 dark:text-amber-400' },
+    { code: 'C', label: 'Cuti',  cls: 'bg-violet-500/15 text-violet-700 border-violet-500/40 dark:text-violet-400' },
+    { code: 'L', label: 'Libur', cls: 'bg-slate-500/15 text-slate-700 border-slate-500/40 dark:text-slate-300' },
+  ];
+  const isPresent = attendanceStatus === 'H';
 
   const canChooseOutlet = role === 'admin' || role === 'management';
   const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
