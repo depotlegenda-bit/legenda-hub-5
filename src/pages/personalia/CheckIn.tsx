@@ -265,6 +265,10 @@ export default function CheckInPage() {
       toast({ title: 'Pilih shift dulu', description: 'Shift wajib dipilih agar status absen dapat dievaluasi.', variant: 'destructive' });
       return;
     }
+    if (!isPresent && !notes.trim()) {
+      toast({ title: 'Catatan wajib diisi', description: `Status ${STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label} harus disertai alasan/keterangan.`, variant: 'destructive' });
+      return;
+    }
     setSubmitting(true);
     try {
       const filename = `${user.id}/${Date.now()}.jpg`;
@@ -541,7 +545,11 @@ export default function CheckInPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={isPresent ? 'Misal: izin ke bank, dll.' : 'Tulis alasan / keterangan...'}
                   rows={2}
+                  className={(!isPresent && !notes.trim()) ? 'border-destructive focus-visible:ring-destructive' : ''}
                 />
+                {(!isPresent && !notes.trim()) && (
+                  <p className="text-xs text-destructive">Catatan wajib diisi untuk status ini.</p>
+                )}
               </div>
               <Button
                 onClick={handleSubmit}
