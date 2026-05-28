@@ -611,7 +611,16 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
             <tbody>
               {summary.map((s) => (
                 <tr key={s.name} className="border-b border-border/50">
-                  <td className="p-3 font-medium">{s.name}</td>
+                  <td className="p-3 font-medium">
+                    <button
+                      type="button"
+                      onClick={() => setDetailUserId(s.user_id)}
+                      className="text-left hover:text-primary hover:underline focus:outline-none focus:text-primary"
+                      title="Lihat detail absensi bulan ini"
+                    >
+                      {s.name}
+                    </button>
+                  </td>
                   <td className="p-3 text-center">{s.H}</td>
                   <td className="p-3 text-center">{s.I}</td>
                   <td className="p-3 text-center">{s.S}</td>
