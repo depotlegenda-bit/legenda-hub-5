@@ -363,7 +363,23 @@ export default function AttendancePage() {
   );
 }
 
-function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Profile[]; role: AppRole | null }) {
+function RecapTab({
+  outletId,
+  profiles,
+  role,
+  outlets,
+  selectedOutlet,
+  setSelectedOutlet,
+  outletsLoading,
+}: {
+  outletId: string;
+  profiles: Profile[];
+  role: AppRole | null;
+  outlets: { id: string; name: string }[];
+  selectedOutlet: string;
+  setSelectedOutlet: (id: string) => void;
+  outletsLoading: boolean;
+}) {
   const { toast } = useToast();
   const isAdmin = role === 'admin';
   const { resolve: resolveThresholds } = useAttendanceThresholds();
