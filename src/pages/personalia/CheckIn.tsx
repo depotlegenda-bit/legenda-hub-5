@@ -485,28 +485,75 @@ export default function CheckInPage() {
         {photoPreview && coords && (
           <Card className="glass-card">
             <CardContent className="p-4 space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  variant={logType === 'check_in' ? 'default' : 'outline'}
-                  onClick={() => setLogType('check_in')}
-                  className="flex-1 gap-2"
-                >
-                  <LogIn className="w-4 h-4" /> Check-In (Masuk)
-                </Button>
-                <Button
-                  variant={logType === 'check_out' ? 'default' : 'outline'}
-                  onClick={() => setLogType('check_out')}
-                  className="flex-1 gap-2"
-                >
-                  <LogOut className="w-4 h-4" /> Check-Out (Pulang)
-                </Button>
-              </div>
               <div className="space-y-2">
-                <Label>Catatan (opsional)</Label>
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Misal: izin ke bank, dll." rows={2} />
+                <Label>Status Kehadiran</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {STATUS_OPTIONS.map((s) => {
+                    const active = attendanceStatus === s.code;
+                    return (
+                      <button
+                        key={s.code}
+                        type="button"
+                        onClick={() => setAttendanceStatus(s.code)}
+                        className={
+                          'px-2 py-2 rounded-md border text-xs font-semibold transition-all ' +
+                          (active ? s.cls : 'border-border text-muted-foreground hover:bg-muted')
+                        }
+                      >
+                        <div className="font-bold text-sm">{s.code}</div>
+                        <div className="text-[10px]">{s.label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {!isPresent && (
+                  <p className="text-xs text-muted-foreground">
+                    Absen {STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label} — selfie & lokasi tetap dicatat sebagai bukti. Tulis alasan di catatan.
+                  </p>
+                )}
               </div>
-              <Button onClick={handleSubmit} disabled={submitting} className="w-full" size="lg">
-                {submitting ? 'Menyimpan...' : `Simpan ${logType === 'check_in' ? 'Check-In' : 'Check-Out'}`}
+
+              {isPresent && (
+                <div className="flex gap-2">
+                  <Button
+                    variant={logType === 'check_in' ? 'default' : 'outline'}
+                    onClick={() => setLogType('check_in')}
+                    className="flex-1 gap-2"
+                  >
+                    <LogIn className="w-4 h-4" /> Check-In (Masuk)
+                  </Button>
+                  <Button
+                    variant={logType === 'check_out' ? 'default' : 'outline'}
+                    onClick={() => setLogType('check_out')}
+                    className="flex-1 gap-2"
+                  >
+                    <LogOut className="w-4 h-4" /> Check-Out (Pulang)
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>
+                  Catatan {isPresent ? '(opsional)' : <span className="text-destructive">(wajib)</span>}
+                </Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={isPresent ? 'Misal: izin ke bank, dll.' : 'Tulis alasan / keterangan...'}
+                  rows={2}
+                />
+              </div>
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting || (!isPresent && !notes.trim())}
+                className="w-full"
+                size="lg"
+              >
+                {submitting
+                  ? 'Menyimpan...'
+                  : isPresent
+                    ? `Simpan ${logType === 'check_in' ? 'Check-In' : 'Check-Out'}`
+                    : `Simpan Absen ${STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label}`}
               </Button>
             </CardContent>
           </Card>
