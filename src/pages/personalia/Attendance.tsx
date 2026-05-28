@@ -793,6 +793,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
                           <th className="p-2">Status</th>
                           <th className="p-2 text-right">Terlambat</th>
                           <th className="p-2">Keterangan</th>
+                          {isAdmin && <th className="p-2 text-right">Aksi</th>}
                         </tr>
                       </thead>
                       <tbody>
