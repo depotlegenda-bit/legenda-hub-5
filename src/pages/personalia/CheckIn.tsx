@@ -275,10 +275,11 @@ export default function CheckInPage() {
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('attendance-selfies').getPublicUrl(filename);
 
+      const effectiveLogType = isPresent ? logType : 'check_in';
       const { error: insErr } = await (supabase as any).from('attendance_logs').insert({
         user_id: user.id,
         outlet_id: effectiveOutlet?.id || null,
-        log_type: logType,
+        log_type: effectiveLogType,
         shift_name: selectedShift || 'Default',
         selfie_url: publicUrl,
         latitude: coords.coords.latitude,
@@ -288,6 +289,10 @@ export default function CheckInPage() {
         out_of_radius: outOfRadius,
         device_info: navigator.userAgent.slice(0, 200),
         notes: notes || null,
+        status_override: attendanceStatus,
+        status_override_at: new Date().toISOString(),
+        status_override_by: user.id,
+        status_override_note: !isPresent ? (notes || STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label || null) : null,
       });
       if (insErr) throw insErr;
 
