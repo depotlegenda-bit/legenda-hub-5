@@ -545,7 +545,11 @@ export default function CheckInPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={isPresent ? 'Misal: izin ke bank, dll.' : 'Tulis alasan / keterangan...'}
                   rows={2}
+                  className={(!isPresent && !notes.trim()) ? 'border-destructive focus-visible:ring-destructive' : ''}
                 />
+                {(!isPresent && !notes.trim()) && (
+                  <p className="text-xs text-destructive">Catatan wajib diisi untuk status ini.</p>
+                )}
               </div>
               <Button
                 onClick={handleSubmit}
