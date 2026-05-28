@@ -85,7 +85,7 @@ const createAttendanceDraft = () => ({
 export default function AttendancePage() {
   const { role } = useAuth();
   const canManageOutlets = role === 'management' || role === 'admin';
-  const [mainTab, setMainTab] = useTabParam('input');
+  const [mainTab, setMainTab] = useTabParam('recap');
   const { toast } = useToast();
   const { outlets, selectedOutlet, setSelectedOutlet, loading: outletsLoading } = useOutlets({ includeManagement: true });
   const attendanceDraft = usePersistentDraft('draft:attendance-input-v1', createAttendanceDraft());
