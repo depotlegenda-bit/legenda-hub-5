@@ -478,6 +478,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
     const totalLate = recs.reduce((s, r) => s + (r.late_minutes || 0), 0);
     const totalCashbon = recs.reduce((s, r) => s + Number(r.cashbon_amount || 0), 0);
     return {
+      user_id: p.user_id,
       name: p.full_name,
       H: count('hadir'), I: count('izin'), S: count('sakit'),
       C: count('cuti'), L: count('libur'), T: count('alpha'),
