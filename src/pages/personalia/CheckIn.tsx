@@ -296,8 +296,9 @@ export default function CheckInPage() {
       });
       if (insErr) throw insErr;
 
+      const statusLabel = STATUS_OPTIONS.find((o) => o.code === attendanceStatus)?.label || 'Hadir';
       toast({
-        title: `${logType === 'check_in' ? 'Check-in' : 'Check-out'} berhasil!`,
+        title: isPresent ? `${logType === 'check_in' ? 'Check-in' : 'Check-out'} berhasil!` : `Absen ${statusLabel} tercatat`,
         description: outOfRadius ? '⚠️ Tercatat dengan flag di luar radius outlet.' : 'Absensi tersimpan.',
       });
       setPhotoBlob(null);
