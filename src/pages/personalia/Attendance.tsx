@@ -359,6 +359,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
   const [autoCount, setAutoCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
 
   const reload = () => {
     if (!outletId || profiles.length === 0) { setRecords([]); setAutoCount(0); return; }
