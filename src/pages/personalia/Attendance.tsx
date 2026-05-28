@@ -543,30 +543,87 @@ export default function AttendancePage() {
 function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Profile[]; role: AppRole | null }) {
   const { toast } = useToast();
   const isAdmin = role === 'admin';
+  const { resolve: resolveThresholds } = useAttendanceThresholds();
   const now = new Date();
   const [month, setMonth] = usePersistentState<number>('attendance:recap:month', now.getMonth() + 1);
   const [year, setYear] = usePersistentState<number>('attendance:recap:year', now.getFullYear());
   const [records, setRecords] = useState<any[]>([]);
+  const [autoCount, setAutoCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
 
   const reload = () => {
-    if (!outletId || profiles.length === 0) { setRecords([]); return; }
+    if (!outletId || profiles.length === 0) { setRecords([]); setAutoCount(0); return; }
     setLoading(true);
     const start = `${year}-${String(month).padStart(2, '0')}-01`;
     const endDate = new Date(year, month, 0).getDate();
     const end = `${year}-${String(month).padStart(2, '0')}-${String(endDate).padStart(2, '0')}`;
-    supabase
-      .from('attendance')
-      .select('*')
-      .gte('attendance_date', start)
-      .lte('attendance_date', end)
-      .in('user_id', profiles.map((p) => p.user_id))
-      .order('attendance_date', { ascending: false })
-      .then(({ data }) => {
-        setRecords(data || []);
-        setLoading(false);
+    const userIds = profiles.map((p) => p.user_id);
+    const startLocal = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const endLocal = new Date(year, month - 1, endDate, 23, 59, 59, 999);
+
+    Promise.all([
+      supabase
+        .from('attendance')
+        .select('*')
+        .gte('attendance_date', start)
+        .lte('attendance_date', end)
+        .in('user_id', userIds)
+        .order('attendance_date', { ascending: false }),
+      supabase
+        .from('attendance_logs')
+        .select('id,user_id,log_type,created_at,outlet_id,shift_name')
+        .gte('created_at', startLocal.toISOString())
+        .lte('created_at', endLocal.toISOString())
+        .in('user_id', userIds),
+    ]).then(([attRes, logsRes]) => {
+      const manual = (attRes.data || []) as any[];
+      const manualKeys = new Set(manual.map((r) => `${r.user_id}__${r.attendance_date}`));
+
+      // Group log selfie per user_id + tanggal lokal
+      const logsByKey: Record<string, any[]> = {};
+      (logsRes.data || []).forEach((l: any) => {
+        const d = new Date(l.created_at);
+        const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const key = `${l.user_id}__${localDate}`;
+        if (!logsByKey[key]) logsByKey[key] = [];
+        logsByKey[key].push(l);
       });
+
+      // Buat virtual record dari log selfie untuk tanggal yang belum punya entri manual
+      const virtual: any[] = [];
+      Object.entries(logsByKey).forEach(([key, logs]) => {
+        if (manualKeys.has(key)) return;
+        const [user_id, attendance_date] = key.split('__');
+        const ins = logs.filter((l) => l.log_type === 'check_in').sort((a, b) => a.created_at.localeCompare(b.created_at));
+        const outs = logs.filter((l) => l.log_type === 'check_out').sort((a, b) => a.created_at.localeCompare(b.created_at));
+        const firstIn = ins[0];
+        const lastOut = outs[outs.length - 1];
+        let lateMin = 0;
+        if (firstIn) {
+          const th = resolveThresholds(firstIn.outlet_id, firstIn.shift_name || 'Default');
+          const info = getAttendanceStatus(firstIn.created_at, 'check_in', th);
+          if (info.key === 'late') lateMin = Math.max(0, info.diffMinutes);
+        }
+        const fmt = (iso?: string) => iso ? format(new Date(iso), 'HH:mm') : '-';
+        virtual.push({
+          id: `selfie-${key}`,
+          user_id,
+          attendance_date,
+          status: 'hadir',
+          late_minutes: lateMin,
+          late_notes: `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`,
+          cashbon_amount: 0,
+          cashbon_notes: '',
+          _auto: true,
+        });
+      });
+
+      const merged = [...manual, ...virtual].sort((a, b) => (b.attendance_date || '').localeCompare(a.attendance_date || ''));
+      setRecords(merged);
+      setAutoCount(virtual.length);
+      setLoading(false);
+    });
   };
 
   useEffect(() => { reload(); }, [outletId, month, year, profiles]);
