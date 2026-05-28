@@ -823,39 +823,52 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
                     const dupKey = `${r.user_id}__${r.attendance_date}`;
                     const isDup = duplicateGroups.some((g) => g[0] && `${g[0].user_id}__${g[0].attendance_date}` === dupKey);
                     return (
-                      <tr key={r.id} className={cn('border-t border-border/50 hover:bg-muted/20', isDup && 'bg-destructive/5')}>
+                      <tr key={r.id} className={cn('border-t border-border/50 hover:bg-muted/20', isDup && 'bg-destructive/5', r._auto && 'bg-emerald-500/5')}>
                         <td className="p-3 font-mono text-xs">{r.attendance_date}</td>
                         <td className="p-3">
-                          <div className="font-medium">{prof?.full_name || '—'}</div>
+                          <div className="font-medium flex items-center gap-1.5">
+                            {prof?.full_name || '—'}
+                            {r._auto && (
+                              <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded">
+                                <Camera className="w-3 h-3" /> Selfie
+                              </span>
+                            )}
+                          </div>
                           {isDup && <span className="text-[10px] uppercase font-bold text-destructive">Duplikat</span>}
+                          {r._auto && r.late_notes && <div className="text-[10px] text-muted-foreground mt-0.5">{r.late_notes}</div>}
                         </td>
                         <td className="p-3"><span className="text-xs font-bold">{DB_TO_CODE[r.status] || r.status}</span></td>
                         <td className="p-3 text-right">{r.late_minutes || 0} mnt</td>
                         <td className="p-3 text-right">Rp {Number(r.cashbon_amount || 0).toLocaleString('id-ID')}</td>
                         <td className="p-3 text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Hapus entri absen?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  {prof?.full_name} · {r.attendance_date} · {DB_TO_CODE[r.status] || r.status}. Tindakan ini tidak dapat dibatalkan.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Batal</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteOne(r.id)}>Hapus</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {r._auto ? (
+                            <span className="text-[10px] text-muted-foreground italic">Otomatis</span>
+                          ) : (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Hapus entri absen?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {prof?.full_name} · {r.attendance_date} · {DB_TO_CODE[r.status] || r.status}. Tindakan ini tidak dapat dibatalkan.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Batal</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteOne(r.id)}>Hapus</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
+
                 </tbody>
               </table>
             </div>
