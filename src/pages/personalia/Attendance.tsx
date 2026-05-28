@@ -379,7 +379,7 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
         .order('attendance_date', { ascending: false }),
       supabase
         .from('attendance_logs')
-        .select('id,user_id,log_type,created_at,outlet_id,shift_name')
+        .select('id,user_id,log_type,created_at,outlet_id,shift_name,status_override,status_override_note,notes')
         .gte('created_at', startLocal.toISOString())
         .lte('created_at', endLocal.toISOString())
         .in('user_id', userIds),
@@ -398,6 +398,12 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
       });
 
       // Buat virtual record dari log selfie untuk tanggal yang belum punya entri manual
+      const STATUS_FROM_OVERRIDE: Record<string, string> = {
+        H: 'hadir', I: 'izin', S: 'sakit', C: 'cuti', L: 'libur',
+      };
+      const STATUS_LABEL: Record<string, string> = {
+        H: 'Hadir', I: 'Izin', S: 'Sakit', C: 'Cuti', L: 'Libur',
+      };
       const virtual: any[] = [];
       Object.entries(logsByKey).forEach(([key, logs]) => {
         if (manualKeys.has(key)) return;
@@ -406,20 +412,34 @@ function RecapTab({ outletId, profiles, role }: { outletId: string; profiles: Pr
         const outs = logs.filter((l) => l.log_type === 'check_out').sort((a, b) => a.created_at.localeCompare(b.created_at));
         const firstIn = ins[0];
         const lastOut = outs[outs.length - 1];
+
+        // Status diambil dari status_override pertama yang bukan 'H' (prioritaskan non-hadir),
+        // atau 'H' bila semua log H / tidak ada override.
+        const overrides = logs.map((l) => l.status_override).filter(Boolean) as string[];
+        const nonH = overrides.find((s) => s !== 'H');
+        const statusCode = nonH || overrides[0] || 'H';
+        const dbStatus = STATUS_FROM_OVERRIDE[statusCode] || 'hadir';
+        const isPresent = statusCode === 'H';
+
         let lateMin = 0;
-        if (firstIn) {
+        if (isPresent && firstIn) {
           const th = resolveThresholds(firstIn.outlet_id, firstIn.shift_name || 'Default');
           const info = getAttendanceStatus(firstIn.created_at, 'check_in', th);
           if (info.key === 'late') lateMin = Math.max(0, info.diffMinutes);
         }
         const fmt = (iso?: string) => iso ? format(new Date(iso), 'HH:mm') : '-';
+        const userNote = logs.map((l) => l.status_override_note || l.notes).filter(Boolean)[0] || '';
+        const lateNotes = isPresent
+          ? `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`
+          : `${STATUS_LABEL[statusCode] || statusCode}${userNote ? ` — ${userNote}` : ''}`;
+
         virtual.push({
           id: `selfie-${key}`,
           user_id,
           attendance_date,
-          status: 'hadir',
+          status: dbStatus,
           late_minutes: lateMin,
-          late_notes: `Selfie: IN ${fmt(firstIn?.created_at)}${lastOut ? ` · OUT ${fmt(lastOut.created_at)}` : ''}`,
+          late_notes: lateNotes,
           cashbon_amount: 0,
           cashbon_notes: '',
           _auto: true,
