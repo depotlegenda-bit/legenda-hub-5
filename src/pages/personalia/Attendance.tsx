@@ -418,11 +418,14 @@ function RecapTab({
     if (!detailUserId) return;
     setEditSaving(true);
     const rec = records.find((r) => r.user_id === detailUserId && r.attendance_date === ds);
+    const status = rec?.status || 'hadir';
+    // Status selain Hadir tidak dihitung terlambat
+    const effectiveLate = status === 'hadir' ? editValue : 0;
     let error: any = null;
     if (rec && !rec._auto) {
       const res = await supabase
         .from('attendance')
-        .update({ late_minutes: editValue, late_notes: editNotes })
+        .update({ late_minutes: effectiveLate, late_notes: editNotes })
         .eq('id', rec.id);
       error = res.error;
     } else {
@@ -431,8 +434,8 @@ function RecapTab({
         user_id: detailUserId,
         outlet_id: outletId,
         attendance_date: ds,
-        status: rec?.status || 'hadir',
-        late_minutes: editValue,
+        status,
+        late_minutes: effectiveLate,
         late_notes: editNotes,
         cashbon_amount: rec?.cashbon_amount || 0,
         cashbon_notes: rec?.cashbon_notes || '',
