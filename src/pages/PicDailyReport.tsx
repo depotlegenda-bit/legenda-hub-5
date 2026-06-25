@@ -8,25 +8,73 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { ClipboardCheck, Loader2, Save, Trash2, X, Eye } from 'lucide-react';
+import { ClipboardCheck, Loader2, Save, Trash2, X, Eye, Sunrise, Activity, Moon } from 'lucide-react';
+
+// === Definisi 3 segmen checklist ===
+const SEGMENTS = [
+  {
+    key: 'opening',
+    title: 'Opening',
+    icon: Sunrise,
+    items: [
+      'Opening sesuai jam buka outlet',
+      'Cek kelengkapan bahan',
+      'Cek kelengkapan staf',
+      'Cek modal awal',
+      'Cek online food',
+      'Cek kebersihan area',
+      'Cek kebersihan dapur',
+      'Cek asbak dan tisu',
+    ],
+  },
+  {
+    key: 'operasional',
+    title: 'Operasional',
+    icon: Activity,
+    items: [
+      'Pesanan keluar tidak lebih dari 20 menit',
+      'Pesanan keluar sesuai SOP',
+      'Memasak sesuai SOP',
+      'Tidak ada salah pesanan / salah antar pesanan',
+      'Memastikan meja segera di cleanup',
+      'Memastikan staf tetap dengan groomingnya',
+      'Memastikan staf ramah dan menjaga attitude',
+    ],
+  },
+  {
+    key: 'closing',
+    title: 'Closing',
+    icon: Moon,
+    items: [
+      'Memastikan kebersihan area',
+      'Memastikan stok opname',
+      'Memastikan tidak ada minus di kasir',
+      'Pelaporan closing report / omset di group',
+      'Memastikan cucian kotor sudah bersih semua',
+      'Memastikan sampah terbuang',
+      'Memastikan sanitasi / selokan bersih',
+      'Memastikan kebersihan kamar mandi',
+      'Mematikan semua peralatan yg terkoneksi listrik (yg perlu dimatikan)',
+      'Memastikan modal kasir untuk besok',
+      'Mematikan lampu dan mengunci pintu',
+    ],
+  },
+] as const;
+
+type ChecklistMap = Record<string, Record<string, boolean>>;
 
 type Report = {
   id: string;
   user_id: string;
   outlet_id: string | null;
   report_date: string;
-  operational_condition: string;
-  crew_present: number | null;
-  cleanliness: string | null;
-  equipment_condition: string | null;
-  critical_stock: string | null;
-  issues: string | null;
-  actions_taken: string | null;
+  checklist: ChecklistMap;
   notes_for_management: string | null;
   photos: string[];
   created_at: string;
@@ -36,14 +84,38 @@ type Report = {
 type Outlet = { id: string; name: string };
 type ProfileLite = { user_id: string; full_name: string; outlet_id: string | null };
 
-const OPERATIONAL = ['Lancar', 'Ada Kendala', 'Tutup Sementara'];
-const CLEANLINESS = ['Baik', 'Cukup', 'Kurang'];
-const EQUIPMENT = ['Normal', 'Perlu Perbaikan', 'Rusak'];
-
 function todayIso() {
   const d = new Date();
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+}
+
+function emptyChecklist(): ChecklistMap {
+  const obj: ChecklistMap = {};
+  SEGMENTS.forEach((s) => {
+    obj[s.key] = {};
+    s.items.forEach((it) => (obj[s.key][it] = false));
+  });
+  return obj;
+}
+
+function countChecked(cl: ChecklistMap, segKey: string) {
+  const seg = SEGMENTS.find((s) => s.key === segKey);
+  if (!seg) return { done: 0, total: 0 };
+  const map = cl?.[segKey] || {};
+  const done = seg.items.filter((it) => !!map[it]).length;
+  return { done, total: seg.items.length };
+}
+
+function totalProgress(cl: ChecklistMap) {
+  let done = 0;
+  let total = 0;
+  SEGMENTS.forEach((s) => {
+    const c = countChecked(cl, s.key);
+    done += c.done;
+    total += c.total;
+  });
+  return { done, total };
 }
 
 export default function PicDailyReportPage() {
@@ -53,25 +125,18 @@ export default function PicDailyReportPage() {
 
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
-  const [myProfile, setMyProfile] = useState<ProfileLite | null>(null);
 
-  // form state
+  // form
   const [reportDate, setReportDate] = useState<string>(todayIso());
   const [outletId, setOutletId] = useState<string>('');
-  const [operational, setOperational] = useState<string>('Lancar');
-  const [crewPresent, setCrewPresent] = useState<string>('');
-  const [cleanliness, setCleanliness] = useState<string>('Baik');
-  const [equipment, setEquipment] = useState<string>('Normal');
-  const [criticalStock, setCriticalStock] = useState<string>('');
-  const [issues, setIssues] = useState<string>('');
-  const [actions, setActions] = useState<string>('');
+  const [checklist, setChecklist] = useState<ChecklistMap>(emptyChecklist());
   const [notesMgmt, setNotesMgmt] = useState<string>('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
 
-  // recap state
+  // recap
   const [recap, setRecap] = useState<Report[]>([]);
   const [recapLoading, setRecapLoading] = useState(false);
   const [filterFrom, setFilterFrom] = useState<string>(() => {
@@ -85,7 +150,6 @@ export default function PicDailyReportPage() {
   const [filterPic, setFilterPic] = useState<string>('all');
   const [detail, setDetail] = useState<Report | null>(null);
 
-  // Load outlets + profiles
   useEffect(() => {
     supabase.from('outlets').select('id, name').order('name').then(({ data }) => {
       if (data) setOutlets(data);
@@ -99,7 +163,6 @@ export default function PicDailyReportPage() {
       });
   }, []);
 
-  // Load own profile + default outlet for form
   useEffect(() => {
     if (!user) return;
     supabase
@@ -108,14 +171,11 @@ export default function PicDailyReportPage() {
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) {
-          setMyProfile(data as ProfileLite);
-          if (!outletId && data.outlet_id) setOutletId(data.outlet_id);
-        }
+        if (data && !outletId && data.outlet_id) setOutletId(data.outlet_id);
       });
   }, [user]);
 
-  // Load existing report for selected date+outlet (current user)
+  // Load existing
   useEffect(() => {
     if (!user || !outletId || !reportDate) return;
     supabase
@@ -129,24 +189,19 @@ export default function PicDailyReportPage() {
         if (data) {
           const r = data as any;
           setExistingId(r.id);
-          setOperational(r.operational_condition || 'Lancar');
-          setCrewPresent(r.crew_present?.toString() ?? '');
-          setCleanliness(r.cleanliness || 'Baik');
-          setEquipment(r.equipment_condition || 'Normal');
-          setCriticalStock(r.critical_stock || '');
-          setIssues(r.issues || '');
-          setActions(r.actions_taken || '');
+          const base = emptyChecklist();
+          const incoming = (r.checklist || {}) as ChecklistMap;
+          SEGMENTS.forEach((s) => {
+            s.items.forEach((it) => {
+              base[s.key][it] = !!incoming?.[s.key]?.[it];
+            });
+          });
+          setChecklist(base);
           setNotesMgmt(r.notes_for_management || '');
           setPhotos(Array.isArray(r.photos) ? r.photos : []);
         } else {
           setExistingId(null);
-          setOperational('Lancar');
-          setCrewPresent('');
-          setCleanliness('Baik');
-          setEquipment('Normal');
-          setCriticalStock('');
-          setIssues('');
-          setActions('');
+          setChecklist(emptyChecklist());
           setNotesMgmt('');
           setPhotos([]);
         }
@@ -169,7 +224,13 @@ export default function PicDailyReportPage() {
       toast({ title: 'Gagal memuat rekap', description: error.message, variant: 'destructive' });
       return;
     }
-    setRecap((data || []).map((r: any) => ({ ...r, photos: Array.isArray(r.photos) ? r.photos : [] })));
+    setRecap(
+      (data || []).map((r: any) => ({
+        ...r,
+        photos: Array.isArray(r.photos) ? r.photos : [],
+        checklist: (r.checklist || {}) as ChecklistMap,
+      })),
+    );
   };
 
   useEffect(() => {
@@ -179,6 +240,13 @@ export default function PicDailyReportPage() {
 
   const outletNameMap = useMemo(() => Object.fromEntries(outlets.map((o) => [o.id, o.name])), [outlets]);
   const picNameMap = useMemo(() => Object.fromEntries(profiles.map((p) => [p.user_id, p.full_name])), [profiles]);
+
+  const toggleItem = (segKey: string, item: string, checked: boolean) => {
+    setChecklist((prev) => ({
+      ...prev,
+      [segKey]: { ...prev[segKey], [item]: checked },
+    }));
+  };
 
   const handleUploadPhotos = async (files: FileList | null) => {
     if (!files || !files.length || !user) return;
@@ -217,19 +285,15 @@ export default function PicDailyReportPage() {
       return;
     }
     setSaving(true);
-    const payload = {
+    const payload: any = {
       user_id: user.id,
       outlet_id: outletId,
       report_date: reportDate,
-      operational_condition: operational,
-      crew_present: crewPresent ? parseInt(crewPresent, 10) : null,
-      cleanliness,
-      equipment_condition: equipment,
-      critical_stock: criticalStock || null,
-      issues: issues || null,
-      actions_taken: actions || null,
+      checklist,
       notes_for_management: notesMgmt || null,
       photos,
+      // Field lama dikosongkan agar tidak menyesatkan
+      operational_condition: 'Lancar',
     };
     const { data, error } = existingId
       ? await supabase.from('pic_daily_reports').update(payload).eq('id', existingId).select().maybeSingle()
@@ -257,15 +321,7 @@ export default function PicDailyReportPage() {
     setDetail(null);
   };
 
-  const conditionBadge = (val: string) => {
-    const color =
-      val === 'Lancar' || val === 'Baik' || val === 'Normal'
-        ? 'default'
-        : val === 'Ada Kendala' || val === 'Cukup' || val === 'Perlu Perbaikan'
-        ? 'secondary'
-        : 'destructive';
-    return <Badge variant={color as any}>{val}</Badge>;
-  };
+  const progress = totalProgress(checklist);
 
   return (
     <AppLayout>
@@ -285,12 +341,15 @@ export default function PicDailyReportPage() {
           <TabsContent value="input">
             <Card>
               <CardHeader>
-                <CardTitle>
-                  {existingId ? 'Perbarui Laporan' : 'Input Laporan Harian'}
+                <CardTitle className="flex items-center justify-between">
+                  <span>{existingId ? 'Perbarui Laporan' : 'Input Laporan Harian'}</span>
+                  <Badge variant="secondary">
+                    {progress.done}/{progress.total} checklist
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label>Tanggal</Label>
                     <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
@@ -308,59 +367,57 @@ export default function PicDailyReportPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label>Kondisi Operasional</Label>
-                    <Select value={operational} onValueChange={setOperational}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {OPERATIONAL.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <Label>Jumlah Crew Hadir</Label>
-                    <Input type="number" min={0} value={crewPresent} onChange={(e) => setCrewPresent(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Kondisi Kebersihan</Label>
-                    <Select value={cleanliness} onValueChange={setCleanliness}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {CLEANLINESS.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Kondisi Peralatan</Label>
-                    <Select value={equipment} onValueChange={setEquipment}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {EQUIPMENT.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  {SEGMENTS.map((seg) => {
+                    const Icon = seg.icon;
+                    const c = countChecked(checklist, seg.key);
+                    return (
+                      <Card key={seg.key} className="border-muted">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                              <Icon className="h-4 w-4" />
+                              {seg.title}
+                            </span>
+                            <Badge variant="outline">{c.done}/{c.total}</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {seg.items.map((it) => {
+                            const id = `${seg.key}-${it}`;
+                            const checked = !!checklist[seg.key]?.[it];
+                            return (
+                              <label
+                                key={it}
+                                htmlFor={id}
+                                className="flex items-start gap-2 text-sm cursor-pointer leading-snug"
+                              >
+                                <Checkbox
+                                  id={id}
+                                  checked={checked}
+                                  onCheckedChange={(v) => toggleItem(seg.key, it, !!v)}
+                                  className="mt-0.5"
+                                />
+                                <span className={checked ? 'line-through text-muted-foreground' : ''}>{it}</span>
+                              </label>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label>Stok Bahan Kritis</Label>
-                    <Textarea rows={3} value={criticalStock} onChange={(e) => setCriticalStock(e.target.value)} placeholder="Item yang menipis / habis..." />
-                  </div>
-                  <div>
-                    <Label>Kendala / Masalah</Label>
-                    <Textarea rows={3} value={issues} onChange={(e) => setIssues(e.target.value)} placeholder="Kendala yang terjadi hari ini..." />
-                  </div>
-                  <div>
-                    <Label>Tindakan yang Diambil</Label>
-                    <Textarea rows={3} value={actions} onChange={(e) => setActions(e.target.value)} placeholder="Tindakan yang sudah dilakukan..." />
-                  </div>
-                  <div>
-                    <Label>Catatan untuk Management</Label>
-                    <Textarea rows={3} value={notesMgmt} onChange={(e) => setNotesMgmt(e.target.value)} placeholder="Hal yang perlu eskalasi ke management..." />
-                  </div>
+                <div>
+                  <Label>Catatan untuk Management</Label>
+                  <Textarea
+                    rows={3}
+                    value={notesMgmt}
+                    onChange={(e) => setNotesMgmt(e.target.value)}
+                    placeholder="Kendala, eskalasi, atau hal penting lainnya..."
+                  />
                 </div>
 
                 <div>
@@ -447,10 +504,10 @@ export default function PicDailyReportPage() {
                         <TableHead>Tanggal</TableHead>
                         <TableHead>PIC</TableHead>
                         <TableHead>Outlet</TableHead>
+                        <TableHead>Opening</TableHead>
                         <TableHead>Operasional</TableHead>
-                        <TableHead>Kebersihan</TableHead>
-                        <TableHead>Peralatan</TableHead>
-                        <TableHead>Kendala</TableHead>
+                        <TableHead>Closing</TableHead>
+                        <TableHead>Catatan</TableHead>
                         <TableHead className="text-right">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -460,22 +517,32 @@ export default function PicDailyReportPage() {
                       ) : recap.length === 0 ? (
                         <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Belum ada laporan</TableCell></TableRow>
                       ) : (
-                        recap.map((r) => (
-                          <TableRow key={r.id} className="cursor-pointer" onClick={() => setDetail(r)}>
-                            <TableCell>{r.report_date}</TableCell>
-                            <TableCell>{picNameMap[r.user_id] || '-'}</TableCell>
-                            <TableCell>{r.outlet_id ? (outletNameMap[r.outlet_id] || '-') : '-'}</TableCell>
-                            <TableCell>{conditionBadge(r.operational_condition)}</TableCell>
-                            <TableCell>{r.cleanliness ? conditionBadge(r.cleanliness) : '-'}</TableCell>
-                            <TableCell>{r.equipment_condition ? conditionBadge(r.equipment_condition) : '-'}</TableCell>
-                            <TableCell className="max-w-[200px] truncate">{r.issues || '-'}</TableCell>
-                            <TableCell className="text-right">
-                              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDetail(r); }}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        recap.map((r) => {
+                          const op = countChecked(r.checklist, 'opening');
+                          const ops = countChecked(r.checklist, 'operasional');
+                          const cl = countChecked(r.checklist, 'closing');
+                          const segBadge = (c: { done: number; total: number }) => {
+                            const v = c.total === 0 ? 0 : c.done / c.total;
+                            const variant = v === 1 ? 'default' : v >= 0.5 ? 'secondary' : 'destructive';
+                            return <Badge variant={variant as any}>{c.done}/{c.total}</Badge>;
+                          };
+                          return (
+                            <TableRow key={r.id} className="cursor-pointer" onClick={() => setDetail(r)}>
+                              <TableCell>{r.report_date}</TableCell>
+                              <TableCell>{picNameMap[r.user_id] || '-'}</TableCell>
+                              <TableCell>{r.outlet_id ? (outletNameMap[r.outlet_id] || '-') : '-'}</TableCell>
+                              <TableCell>{segBadge(op)}</TableCell>
+                              <TableCell>{segBadge(ops)}</TableCell>
+                              <TableCell>{segBadge(cl)}</TableCell>
+                              <TableCell className="max-w-[200px] truncate">{r.notes_for_management || '-'}</TableCell>
+                              <TableCell className="text-right">
+                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDetail(r); }}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
@@ -487,7 +554,7 @@ export default function PicDailyReportPage() {
 
         {/* ---------- Detail Dialog ---------- */}
         <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Detail Laporan — {detail?.report_date}</DialogTitle>
             </DialogHeader>
@@ -496,15 +563,42 @@ export default function PicDailyReportPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div><span className="text-muted-foreground">PIC:</span> {picNameMap[detail.user_id] || '-'}</div>
                   <div><span className="text-muted-foreground">Outlet:</span> {detail.outlet_id ? outletNameMap[detail.outlet_id] : '-'}</div>
-                  <div><span className="text-muted-foreground">Operasional:</span> {conditionBadge(detail.operational_condition)}</div>
-                  <div><span className="text-muted-foreground">Crew Hadir:</span> {detail.crew_present ?? '-'}</div>
-                  <div><span className="text-muted-foreground">Kebersihan:</span> {detail.cleanliness ? conditionBadge(detail.cleanliness) : '-'}</div>
-                  <div><span className="text-muted-foreground">Peralatan:</span> {detail.equipment_condition ? conditionBadge(detail.equipment_condition) : '-'}</div>
                 </div>
-                {detail.critical_stock && <div><div className="text-muted-foreground">Stok Bahan Kritis</div><div className="whitespace-pre-wrap">{detail.critical_stock}</div></div>}
-                {detail.issues && <div><div className="text-muted-foreground">Kendala</div><div className="whitespace-pre-wrap">{detail.issues}</div></div>}
-                {detail.actions_taken && <div><div className="text-muted-foreground">Tindakan</div><div className="whitespace-pre-wrap">{detail.actions_taken}</div></div>}
-                {detail.notes_for_management && <div><div className="text-muted-foreground">Catatan untuk Management</div><div className="whitespace-pre-wrap">{detail.notes_for_management}</div></div>}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {SEGMENTS.map((seg) => {
+                    const Icon = seg.icon;
+                    const c = countChecked(detail.checklist, seg.key);
+                    return (
+                      <div key={seg.key} className="border rounded p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium flex items-center gap-1.5">
+                            <Icon className="h-4 w-4" /> {seg.title}
+                          </div>
+                          <Badge variant="outline">{c.done}/{c.total}</Badge>
+                        </div>
+                        <ul className="space-y-1">
+                          {seg.items.map((it) => {
+                            const done = !!detail.checklist?.[seg.key]?.[it];
+                            return (
+                              <li key={it} className="flex items-start gap-1.5 text-xs">
+                                <span className={done ? 'text-green-600' : 'text-muted-foreground'}>{done ? '✓' : '○'}</span>
+                                <span className={done ? '' : 'text-muted-foreground'}>{it}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {detail.notes_for_management && (
+                  <div>
+                    <div className="text-muted-foreground">Catatan untuk Management</div>
+                    <div className="whitespace-pre-wrap">{detail.notes_for_management}</div>
+                  </div>
+                )}
                 {detail.photos.length > 0 && (
                   <div>
                     <div className="text-muted-foreground mb-1">Foto Lapangan</div>
