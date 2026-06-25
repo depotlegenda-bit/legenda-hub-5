@@ -20,6 +20,7 @@ import {
   Camera,
   Image as ImageIcon,
   Settings as SettingsIcon,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { AppRole } from '@/hooks/useAuth';
 
@@ -90,6 +91,14 @@ export const MENU_GROUPS: MenuGroupDef[] = [
     icon: Send,
     items: [
       { key: 'daily_report.input', to: '/daily-report', icon: Send, label: 'Input Laporan Closing', defaultRoles: ['admin', 'management', 'pic', 'crew', 'stockman', 'staff'] },
+    ],
+  },
+  {
+    key: 'pic_daily',
+    label: 'Laporan Harian PIC',
+    icon: ClipboardCheck,
+    items: [
+      { key: 'pic_daily.report', to: '/pic-daily-report', icon: ClipboardCheck, label: 'Laporan Harian PIC', defaultRoles: ['admin', 'management', 'pic'] },
     ],
   },
   {
