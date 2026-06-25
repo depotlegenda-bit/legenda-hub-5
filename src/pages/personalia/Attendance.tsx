@@ -909,7 +909,7 @@ function RecapTab({
                                     className="h-7 w-20 ml-auto text-right"
                                   />
                                 ) : (
-                                  rec ? `${rec.late_minutes || 0} mnt` : '-'
+                                  rec ? `${rec.status === 'hadir' ? (rec.late_minutes || 0) : 0} mnt` : '-'
                                 )}
                               </td>
                               <td className="p-2 text-xs text-muted-foreground">
