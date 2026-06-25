@@ -802,7 +802,7 @@ function RecapTab({
                           {r._auto && r.late_notes && <div className="text-[10px] text-muted-foreground mt-0.5">{r.late_notes}</div>}
                         </td>
                         <td className="p-3"><span className="text-xs font-bold">{DB_TO_CODE[r.status] || r.status}</span></td>
-                        <td className="p-3 text-right">{r.late_minutes || 0} mnt</td>
+                        <td className="p-3 text-right">{r.status === 'hadir' ? (r.late_minutes || 0) : 0} mnt</td>
                         <td className="p-3 text-right">Rp {Number(r.cashbon_amount || 0).toLocaleString('id-ID')}</td>
                         <td className="p-3 text-right">
                           {r._auto ? (
