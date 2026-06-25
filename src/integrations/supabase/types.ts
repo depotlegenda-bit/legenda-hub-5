@@ -1159,6 +1159,7 @@ export type Database = {
       pic_daily_reports: {
         Row: {
           actions_taken: string | null
+          checklist: Json
           cleanliness: string | null
           created_at: string
           crew_present: number | null
@@ -1176,6 +1177,7 @@ export type Database = {
         }
         Insert: {
           actions_taken?: string | null
+          checklist?: Json
           cleanliness?: string | null
           created_at?: string
           crew_present?: number | null
@@ -1193,6 +1195,7 @@ export type Database = {
         }
         Update: {
           actions_taken?: string | null
+          checklist?: Json
           cleanliness?: string | null
           created_at?: string
           crew_present?: number | null
