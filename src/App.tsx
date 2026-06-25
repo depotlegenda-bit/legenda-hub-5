@@ -45,6 +45,9 @@ import FinancialReport from "./pages/FinancialReport";
 // Marketing
 import ContentPlanPage from "./pages/marketing/ContentPlan";
 
+// Laporan Harian PIC
+import PicDailyReportPage from "./pages/PicDailyReport";
+
 const queryClient = new QueryClient();
 
 function ProtectedRoute({
@@ -119,6 +122,9 @@ function AppRoutes() {
 
       {/* Marketing */}
       <Route path="/marketing/content-plan" element={<ProtectedRoute menuKey="marketing.content" allowedRoles={['management', 'pic']}><ContentPlanPage /></ProtectedRoute>} />
+
+      {/* Laporan Harian PIC */}
+      <Route path="/pic-daily-report" element={<ProtectedRoute menuKey="pic_daily.report" allowedRoles={['management', 'pic']}><PicDailyReportPage /></ProtectedRoute>} />
 
       {/* Settings (admin & management) */}
       <Route path="/settings" element={<ProtectedRoute menuKey="settings.appearance" allowedRoles={['admin', 'management']}><SettingsPage /></ProtectedRoute>} />

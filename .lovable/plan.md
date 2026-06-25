@@ -1,43 +1,60 @@
-## Tujuan
-Menghubungkan tab **Input Absensi** dengan **Log Absen Selfie** agar data kehadiran yang sudah di-submit lewat selfie (check-in/out) otomatis terisi di tabel Input Absensi — mengurangi input ganda dan menyamakan rekap.
+# Draft: Laporan Harian PIC
 
-## Cara kerja yang diusulkan
+Menu baru standalone (di luar group Personalia) untuk PIC mencatat kondisi lapangan harian, plus tab rekap agar Management bisa memantau laporan tiap PIC.
 
-Saat tab **Input Absensi** memuat data untuk `tanggal + outlet`, sistem akan:
-1. Tetap query `attendance` (data yang sudah pernah disimpan manual).
-2. Tambah query `attendance_logs` untuk tanggal + outlet yang sama, ambil semua log selfie hari itu.
-3. Untuk setiap karyawan, gabungkan log selfie-nya:
-   - **Check-in paling awal** → dipakai untuk menentukan status `H` (Hadir) dan menghitung **Terlambat (menit)** otomatis berdasarkan `attendance_thresholds` shift karyawan (`getAttendanceStatus` yg sudah dipakai di tab Logs).
-   - **Check-out paling akhir** → dicatat sebagai jam pulang (info di kolom keterangan).
-4. Jika baris belum punya `existingId` di `attendance` dan ada log selfie → row di-prefill (tidak otomatis dirty, tapi ditandai "dari selfie") sehingga PIC tinggal verifikasi & klik **Simpan**.
-5. Jika sudah ada record di `attendance` → tetap tampilkan badge kecil yang memberi tahu "ada X log selfie hari ini" + tombol "Sinkronkan dari selfie" untuk menimpa late_minutes & status berdasarkan log.
+## Lokasi Menu
+- **Group sidebar baru / standalone**: **Laporan Harian PIC** (sejajar dengan group lain seperti "Laporan Harian Outlet")
+- Icon: `ClipboardCheck` (lucide)
+- Route: `/pic-daily-report`
+- Menu key: `pic_daily.report`
+- Akses default:
+  - PIC, Management, Admin → bisa lihat & input
+  - Management/Admin → bisa lihat & filter rekap semua PIC
+  - PIC → hanya lihat laporannya sendiri + outlet yang ia pegang
 
-## Perubahan UI di tab Input Absensi
-- Kolom **Status Kehadiran**: tambahkan ikon kecil 📷 di samping tombol H bila row punya log selfie.
-- Kolom **Ket. Terlambat**: auto-prefill dengan teks `IN HH:mm · OUT HH:mm` (dari selfie) jika kosong.
-- Tombol baru di toolbar: **"Tarik dari Selfie"** — meng-apply hasil log selfie ke semua row outlet/tanggal terpilih sekaligus (status=H, late_minutes terhitung, keterangan jam IN/OUT).
-- Tooltip pada baris yang sudah disinkronkan: tampilkan jumlah log dan jam IN/OUT terdeteksi.
+## Struktur Halaman (2 Tab)
 
-## Detail teknis
-File yang diubah: `src/pages/personalia/Attendance.tsx`
+### Tab 1 — Input Laporan Harian
+Form harian (1 laporan per PIC per outlet per tanggal). Field draft:
 
-1. Tambah state `selfieLogsByUser: Record<string, AttendanceLog[]>`.
-2. Di efek loader (sekitar baris 144–166), setelah query `attendance`, jalankan query paralel:
-   ```ts
-   supabase.from('attendance_logs')
-     .select('id,user_id,log_type,created_at,outlet_id')
-     .eq('outlet_id', selectedOutlet)
-     .gte('created_at', `${date}T00:00:00`)
-     .lte('created_at', `${date}T23:59:59`)
-   ```
-   Group by `user_id`.
-3. Buat helper `deriveFromSelfie(logs, profile)` yang mengembalikan `{ status:'H', late_minutes, late_notes }` memakai `useAttendanceThresholds().resolve(outletId, shiftName)` + `getAttendanceStatus` (sudah tersedia & dipakai di tab Logs).
-4. Saat membangun `map` row: jika tidak ada `rec` di `attendance` tapi ada logs → pakai hasil `deriveFromSelfie` sebagai default (dirty=false, tandai `fromSelfie:true`).
-5. Tambah tombol "Tarik dari Selfie": iterasi `outletProfiles`, untuk yang punya logs panggil `updateRow` dengan hasil derive (set dirty=true).
-6. Tambah indikator visual (ikon kecil + tooltip jumlah log).
-7. Tidak ada perubahan skema DB. Tidak ada perubahan RLS (PIC sudah punya akses `attendance_logs` outletnya).
+| Field | Tipe | Catatan |
+|---|---|---|
+| Tanggal | date | default hari ini |
+| Outlet | select | auto untuk PIC, pilih untuk management |
+| Kondisi Operasional | select | Lancar / Ada Kendala / Tutup Sementara |
+| Jumlah Crew Hadir | number | opsional |
+| Kondisi Kebersihan | select | Baik / Cukup / Kurang |
+| Kondisi Peralatan | select | Normal / Perlu Perbaikan / Rusak |
+| Stok Bahan Kritis | textarea | item yang menipis |
+| Kendala / Masalah | textarea | |
+| Tindakan yang Diambil | textarea | |
+| Catatan untuk Management | textarea | |
+| Foto Lapangan | upload (multi, opsional) | storage bucket |
 
-## Yang TIDAK diubah
-- Tab Log Absen Selfie tetap seperti sekarang (filter All/IN/OUT yg sudah ditambahkan).
-- Karyawan dengan status I/S/C/L/T tetap diinput manual (selfie hanya menyentuh status H).
-- Tidak otomatis menyimpan ke DB — PIC tetap menekan "Simpan Absensi" untuk konfirmasi.
+Tombol: Simpan / Update (jika sudah ada untuk tanggal & outlet itu).
+
+### Tab 2 — Rekap Laporan
+Filter: rentang tanggal, outlet, PIC.
+Tabel rekap: Tanggal • PIC • Outlet • Kondisi • Kebersihan • Peralatan • Kendala (ringkas) • Aksi (lihat detail).
+Klik baris → dialog detail lengkap + foto.
+Export CSV (ikut pola halaman lain).
+
+## Technical Notes
+
+- **Tabel baru** `pic_daily_reports`: `id`, `user_id` (PIC), `outlet_id`, `report_date`, kolom sesuai field, `photos jsonb`, `created_at`, `updated_at`. Unique `(user_id, outlet_id, report_date)`.
+- **GRANT + RLS**:
+  - PIC: insert/update/select baris miliknya (`user_id = auth.uid()`) dan dibatasi `pic_can_access_outlet`.
+  - Management/Admin: select & update semua.
+- **Storage**: bucket baru `pic-daily-photos` (public read).
+- **Menu registry** (`src/lib/menuRegistry.ts`): tambah group baru standalone `pic_daily` di luar `personalia`, berisi 1 item `pic_daily.report`.
+- **Routing** (`src/App.tsx`): route `/pic-daily-report` dengan `ProtectedRoute menuKey="pic_daily.report"`.
+- **File baru**: `src/pages/PicDailyReport.tsx` (dua tab dengan komponen `Tabs`).
+- **Activity log**: trigger `log_table_activity('PIC Daily Report')` mengikuti pola tabel lain.
+
+## Hal yang Perlu Konfirmasi Sebelum Implementasi
+1. Field form di atas sudah cukup, atau ada yang ditambah/dikurangi?
+2. Foto lapangan: wajib, opsional, atau skip dulu?
+3. 1 laporan per hari per outlet (unique) — setuju?
+4. Nama menu di sidebar: **Laporan Harian PIC** — oke atau ganti?
+
+Setelah kamu approve / koreksi, aku langsung implement (migration + halaman + menu).
