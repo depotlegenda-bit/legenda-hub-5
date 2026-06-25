@@ -315,7 +315,17 @@ export default function AttendancePage() {
     if (ids.length === 0) return;
     setRows((prev) => {
       const next = { ...prev };
-      ids.forEach((id) => { next[id] = { ...next[id], status: code, dirty: true }; });
+      ids.forEach((id) => {
+        const isPresent = code === 'H';
+        next[id] = {
+          ...next[id],
+          status: code,
+          // Reset menit & catatan terlambat saat status bukan Hadir
+          late_minutes: isPresent ? (next[id]?.late_minutes ?? 0) : 0,
+          late_notes: isPresent ? (next[id]?.late_notes ?? '') : '',
+          dirty: true,
+        };
+      });
       return next;
     });
   };
