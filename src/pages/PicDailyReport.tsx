@@ -411,12 +411,12 @@ export default function PicDailyReportPage() {
                 </div>
 
                 <div>
-                  <Label>Catatan untuk Management</Label>
+                  <Label>Temuan Harian</Label>
                   <Textarea
                     rows={3}
                     value={notesMgmt}
                     onChange={(e) => setNotesMgmt(e.target.value)}
-                    placeholder="Kendala, eskalasi, atau hal penting lainnya..."
+                    placeholder="Catatan temuan, kendala, atau hal penting di lapangan hari ini..."
                   />
                 </div>
 
@@ -507,7 +507,7 @@ export default function PicDailyReportPage() {
                         <TableHead>Opening</TableHead>
                         <TableHead>Operasional</TableHead>
                         <TableHead>Closing</TableHead>
-                        <TableHead>Catatan</TableHead>
+                        <TableHead>Temuan Harian</TableHead>
                         <TableHead className="text-right">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -595,7 +595,7 @@ export default function PicDailyReportPage() {
 
                 {detail.notes_for_management && (
                   <div>
-                    <div className="text-muted-foreground">Catatan untuk Management</div>
+                    <div className="text-muted-foreground">Temuan Harian</div>
                     <div className="whitespace-pre-wrap">{detail.notes_for_management}</div>
                   </div>
                 )}
