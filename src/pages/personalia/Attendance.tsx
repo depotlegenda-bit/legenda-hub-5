@@ -276,12 +276,14 @@ export default function AttendancePage() {
     let success = 0;
     let failed = 0;
     for (const [uid, r] of dirty) {
+      const isPresent = r.status === 'H';
       const payload = {
         user_id: uid,
         outlet_id: selectedOutlet,
         attendance_date: date,
         status: CODE_TO_DB[r.status],
-        late_minutes: r.late_minutes,
+        // Status selain Hadir (Izin/Sakit/Alpha/Cuti/Libur) tidak dihitung terlambat
+        late_minutes: isPresent ? r.late_minutes : 0,
         late_notes: r.late_notes,
         cashbon_amount: r.cashbon_amount,
         cashbon_notes: r.cashbon_notes,
