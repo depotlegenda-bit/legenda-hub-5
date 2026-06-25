@@ -276,12 +276,14 @@ export default function AttendancePage() {
     let success = 0;
     let failed = 0;
     for (const [uid, r] of dirty) {
+      const isPresent = r.status === 'H';
       const payload = {
         user_id: uid,
         outlet_id: selectedOutlet,
         attendance_date: date,
         status: CODE_TO_DB[r.status],
-        late_minutes: r.late_minutes,
+        // Status selain Hadir (Izin/Sakit/Alpha/Cuti/Libur) tidak dihitung terlambat
+        late_minutes: isPresent ? r.late_minutes : 0,
         late_notes: r.late_notes,
         cashbon_amount: r.cashbon_amount,
         cashbon_notes: r.cashbon_notes,
@@ -313,7 +315,17 @@ export default function AttendancePage() {
     if (ids.length === 0) return;
     setRows((prev) => {
       const next = { ...prev };
-      ids.forEach((id) => { next[id] = { ...next[id], status: code, dirty: true }; });
+      ids.forEach((id) => {
+        const isPresent = code === 'H';
+        next[id] = {
+          ...next[id],
+          status: code,
+          // Reset menit & catatan terlambat saat status bukan Hadir
+          late_minutes: isPresent ? (next[id]?.late_minutes ?? 0) : 0,
+          late_notes: isPresent ? (next[id]?.late_notes ?? '') : '',
+          dirty: true,
+        };
+      });
       return next;
     });
   };
@@ -406,11 +418,14 @@ function RecapTab({
     if (!detailUserId) return;
     setEditSaving(true);
     const rec = records.find((r) => r.user_id === detailUserId && r.attendance_date === ds);
+    const status = rec?.status || 'hadir';
+    // Status selain Hadir tidak dihitung terlambat
+    const effectiveLate = status === 'hadir' ? editValue : 0;
     let error: any = null;
     if (rec && !rec._auto) {
       const res = await supabase
         .from('attendance')
-        .update({ late_minutes: editValue, late_notes: editNotes })
+        .update({ late_minutes: effectiveLate, late_notes: editNotes })
         .eq('id', rec.id);
       error = res.error;
     } else {
@@ -419,8 +434,8 @@ function RecapTab({
         user_id: detailUserId,
         outlet_id: outletId,
         attendance_date: ds,
-        status: rec?.status || 'hadir',
-        late_minutes: editValue,
+        status,
+        late_minutes: effectiveLate,
         late_notes: editNotes,
         cashbon_amount: rec?.cashbon_amount || 0,
         cashbon_notes: rec?.cashbon_notes || '',
@@ -552,7 +567,7 @@ function RecapTab({
   const summary = profiles.map((p) => {
     const recs = records.filter((r) => r.user_id === p.user_id);
     const count = (db: string) => recs.filter((r) => r.status === db).length;
-    const totalLate = recs.reduce((s, r) => s + (r.late_minutes || 0), 0);
+    const totalLate = recs.reduce((s, r) => s + (r.status === 'hadir' ? (r.late_minutes || 0) : 0), 0);
     const totalCashbon = recs.reduce((s, r) => s + Number(r.cashbon_amount || 0), 0);
     return {
       user_id: p.user_id,
@@ -787,7 +802,7 @@ function RecapTab({
                           {r._auto && r.late_notes && <div className="text-[10px] text-muted-foreground mt-0.5">{r.late_notes}</div>}
                         </td>
                         <td className="p-3"><span className="text-xs font-bold">{DB_TO_CODE[r.status] || r.status}</span></td>
-                        <td className="p-3 text-right">{r.late_minutes || 0} mnt</td>
+                        <td className="p-3 text-right">{r.status === 'hadir' ? (r.late_minutes || 0) : 0} mnt</td>
                         <td className="p-3 text-right">Rp {Number(r.cashbon_amount || 0).toLocaleString('id-ID')}</td>
                         <td className="p-3 text-right">
                           {r._auto ? (
@@ -894,7 +909,7 @@ function RecapTab({
                                     className="h-7 w-20 ml-auto text-right"
                                   />
                                 ) : (
-                                  rec ? `${rec.late_minutes || 0} mnt` : '-'
+                                  rec ? `${rec.status === 'hadir' ? (rec.late_minutes || 0) : 0} mnt` : '-'
                                 )}
                               </td>
                               <td className="p-2 text-xs text-muted-foreground">
