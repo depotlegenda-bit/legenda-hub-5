@@ -567,7 +567,7 @@ function RecapTab({
   const summary = profiles.map((p) => {
     const recs = records.filter((r) => r.user_id === p.user_id);
     const count = (db: string) => recs.filter((r) => r.status === db).length;
-    const totalLate = recs.reduce((s, r) => s + (r.late_minutes || 0), 0);
+    const totalLate = recs.reduce((s, r) => s + (r.status === 'hadir' ? (r.late_minutes || 0) : 0), 0);
     const totalCashbon = recs.reduce((s, r) => s + Number(r.cashbon_amount || 0), 0);
     return {
       user_id: p.user_id,
