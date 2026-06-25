@@ -1156,6 +1156,68 @@ export type Database = {
         }
         Relationships: []
       }
+      pic_daily_reports: {
+        Row: {
+          actions_taken: string | null
+          cleanliness: string | null
+          created_at: string
+          crew_present: number | null
+          critical_stock: string | null
+          equipment_condition: string | null
+          id: string
+          issues: string | null
+          notes_for_management: string | null
+          operational_condition: string
+          outlet_id: string | null
+          photos: Json
+          report_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actions_taken?: string | null
+          cleanliness?: string | null
+          created_at?: string
+          crew_present?: number | null
+          critical_stock?: string | null
+          equipment_condition?: string | null
+          id?: string
+          issues?: string | null
+          notes_for_management?: string | null
+          operational_condition?: string
+          outlet_id?: string | null
+          photos?: Json
+          report_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actions_taken?: string | null
+          cleanliness?: string | null
+          created_at?: string
+          crew_present?: number | null
+          critical_stock?: string | null
+          equipment_condition?: string | null
+          id?: string
+          issues?: string | null
+          notes_for_management?: string | null
+          operational_condition?: string
+          outlet_id?: string | null
+          photos?: Json
+          report_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pic_daily_reports_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: false
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address: string | null
