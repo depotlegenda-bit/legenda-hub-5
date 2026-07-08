@@ -57,6 +57,25 @@ const CODE_TO_DB: Record<StatusCode, string> = {
   H: 'hadir', I: 'izin', S: 'sakit', C: 'cuti', L: 'libur', T: 'alpha',
 };
 
+const normalizeAttendanceOverride = (value?: string | null): StatusCode | null => {
+  if (!value) return null;
+  const upper = value.toUpperCase();
+  if (['H', 'I', 'S', 'C', 'L', 'T'].includes(upper)) return upper as StatusCode;
+  return DB_TO_CODE[value.toLowerCase()] || null;
+};
+
+const isNonPresentAttendance = (code: StatusCode | null) => code === 'I' || code === 'S' || code === 'C' || code === 'L';
+
+const nonPresentStatusInfo = (code: StatusCode) => {
+  const def = STATUS_DEFS.find((s) => s.code === code);
+  return {
+    key: CODE_TO_DB[code],
+    label: def?.label || code,
+    className: def?.cls || 'bg-muted text-muted-foreground',
+    diffMinutes: 0,
+  };
+};
+
 interface Profile {
   user_id: string;
   full_name: string;
@@ -509,7 +528,9 @@ function RecapTab({
 
         // Status diambil dari status_override pertama yang bukan 'H' (prioritaskan non-hadir),
         // atau 'H' bila semua log H / tidak ada override.
-        const overrides = logs.map((l) => l.status_override).filter(Boolean) as string[];
+        const overrides = logs
+          .map((l) => normalizeAttendanceOverride(l.status_override))
+          .filter(Boolean) as StatusCode[];
         const nonH = overrides.find((s) => s !== 'H');
         const statusCode = nonH || overrides[0] || 'H';
         const dbStatus = STATUS_FROM_OVERRIDE[statusCode] || 'hadir';
@@ -1031,6 +1052,11 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   ];
 
   const computeStatus = (log: any) => {
+    const attendanceOverride = normalizeAttendanceOverride(log.status_override);
+    if (attendanceOverride && isNonPresentAttendance(attendanceOverride)) {
+      return { info: nonPresentStatusInfo(attendanceOverride), overridden: false };
+    }
+
     const exempt = isUserExempt(log.user_id);
     const shiftName = log.shift_name || 'Default';
     const auto = getAttendanceStatus(log.created_at, log.log_type, resolveThresholds(log.outlet_id, shiftName), { exempt });
