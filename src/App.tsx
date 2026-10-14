@@ -47,6 +47,7 @@ import ContentPlanPage from "./pages/marketing/ContentPlan";
 
 // Laporan Harian PIC
 import PicDailyReportPage from "./pages/PicDailyReport";
+import HppPage from "./pages/Hpp";
 
 const queryClient = new QueryClient();
 
@@ -127,6 +128,8 @@ function AppRoutes() {
       <Route path="/pic-daily-report" element={<ProtectedRoute menuKey="pic_daily.report" allowedRoles={['management', 'pic']}><PicDailyReportPage /></ProtectedRoute>} />
 
       {/* Settings (admin & management) */}
+      <Route path="/hpp" element={<ProtectedRoute menuKey="hpp.calculator" allowedRoles={['management', 'pic']}><HppPage /></ProtectedRoute>} />
+
       <Route path="/settings" element={<ProtectedRoute menuKey="settings.appearance" allowedRoles={['admin', 'management']}><SettingsPage /></ProtectedRoute>} />
 
       {/* Legacy redirects */}
