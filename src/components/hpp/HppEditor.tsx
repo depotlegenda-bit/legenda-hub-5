@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import HppTemplateDownload from './HppTemplateDownload';
 import { baseUnitInfo, compatibleUnits, calculateHpp, validateProduct, rupiah, UNITS, type Material, type Product } from '@/lib/hpp/calculations';
 
 export function Field({ title, children }: { title: string; children: ReactNode }) {
@@ -15,6 +16,7 @@ export function SelectOptions({ options }: { options: string[] | readonly string
 export function MaterialEditor({ material, materials, products, onSave, onClose }: { material?: Material; materials: Material[]; products: Product[]; onSave: (m: Material) => boolean; onClose: () => void }) {
   const [form, setForm] = useState(material ?? { id: crypto.randomUUID(), name: '', category: 'Bahan Utama', buyUnit: 'kg', buyPrice: 0, buyQty: 1, baseUnit: 'gram', costPerBaseUnit: 0 });
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>{material ? 'Edit Bahan Baku' : 'Tambah Bahan Baku'}</DialogTitle><DialogDescription>Harga bahan HPP</DialogDescription></DialogHeader>
+    <HppTemplateDownload mode="materials" />
     <form className="space-y-4" onSubmit={e => { e.preventDefault(); try {
       if (!form.name.trim()) throw new Error('Nama bahan wajib diisi.');
       if (materials.some(m => m.id !== form.id && m.name.toLowerCase() === form.name.trim().toLowerCase())) throw new Error('Nama bahan sudah ada.');
@@ -37,6 +39,7 @@ export function ProductEditor({ product, products, materials, onSave, onClose }:
   let total = 0;
   try { total = calculateHpp(form, materials).totalHPP; } catch { /* Incomplete ingredient rows */ }
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>{product ? 'Edit Resep & HPP Menu' : 'Buat Resep Menu Baru'}</DialogTitle><DialogDescription>Komposisi per porsi</DialogDescription></DialogHeader>
+    <HppTemplateDownload mode="products" />
     <form className="space-y-5" onSubmit={e => { e.preventDefault(); try {
       validateProduct(form, materials);
       if (products.some(p => p.id !== form.id && p.name.toLowerCase() === form.name.trim().toLowerCase())) throw new Error('Nama menu sudah ada.');
