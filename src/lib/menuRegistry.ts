@@ -21,6 +21,7 @@ import {
   Image as ImageIcon,
   Settings as SettingsIcon,
   ClipboardCheck,
+  Calculator,
 } from 'lucide-react';
 import type { AppRole } from '@/hooks/useAuth';
 
@@ -107,6 +108,14 @@ export const MENU_GROUPS: MenuGroupDef[] = [
     icon: Megaphone,
     items: [
       { key: 'marketing.content', to: '/marketing/content-plan', icon: Megaphone, label: 'Content Plan', defaultRoles: ['admin', 'management', 'pic'] },
+    ],
+  },
+  {
+    key: 'hpp',
+    label: 'HPP',
+    icon: Calculator,
+    items: [
+      { key: 'hpp.calculator', to: '/hpp', icon: Calculator, label: 'HPP', defaultRoles: ['admin', 'management', 'pic'] },
     ],
   },
   {
