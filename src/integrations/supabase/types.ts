@@ -637,6 +637,36 @@ export type Database = {
           },
         ]
       }
+      hpp_workspaces: {
+        Row: {
+          fixed_cost: number
+          id: number
+          materials: Json
+          products: Json
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          fixed_cost?: number
+          id?: number
+          materials?: Json
+          products?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          fixed_cost?: number
+          id?: number
+          materials?: Json
+          products?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           created_at: string | null
@@ -1518,6 +1548,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hpp_has_permission: { Args: { action: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       pic_can_access_outlet: { Args: { _outlet_id: string }; Returns: boolean }
     }
