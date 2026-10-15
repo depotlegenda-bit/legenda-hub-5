@@ -637,6 +637,44 @@ export type Database = {
           },
         ]
       }
+      hpp_outlet_workspaces: {
+        Row: {
+          fixed_cost: number
+          materials: Json
+          outlet_id: string
+          products: Json
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          fixed_cost?: number
+          materials?: Json
+          outlet_id: string
+          products?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          fixed_cost?: number
+          materials?: Json
+          outlet_id?: string
+          products?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hpp_outlet_workspaces_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: true
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hpp_workspaces: {
         Row: {
           fixed_cost: number
