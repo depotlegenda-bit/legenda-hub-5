@@ -1,4 +1,6 @@
 # Tasks
+- [ ] Add admin-managed secondary employee outlets and assigned-outlet selfie attendance.
+- [ ] Verify assignment permissions, outlet selection, and attendance recording.
 - [x] Add standalone HPP menu using the uploaded calculator source without changing other menus.
 - [x] Verify calculator operations and persistence.
 - [x] Add CSV template downloads in both HPP input forms; confirm files are served and accepted by the importer.
