@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Pencil, Users, Trash2 } from 'lucide-react';
 import { useOutlets } from '@/hooks/useOutlets';
+import { Checkbox } from '@/components/ui/checkbox';
+import { canManageAttendanceOutlets } from '@/lib/attendanceOutlets';
 
 interface StaffProfile {
   id: string;
@@ -44,11 +46,30 @@ export default function StaffManagement() {
   const [profiles, setProfiles] = useState<StaffProfile[]>([]);
   const [editProfile, setEditProfile] = useState<StaffProfile | null>(null);
   const [saving, setSaving] = useState(false);
+  const [assignments, setAssignments] = useState<Record<string, string[]>>({});
+  const [extraOutletIds, setExtraOutletIds] = useState<string[]>([]);
+  const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
+  const canAssign = canManageAttendanceOutlets(role);
   const canDelete = role === 'management' || role === 'admin';
 
   const fetchProfiles = async () => {
     const { data } = await supabase.from('profiles').select('*').order('full_name');
     if (data) setProfiles(data as StaffProfile[]);
+    const { data: assigned, error } = await supabase.from('employee_attendance_outlets').select('user_id,outlet_id');
+    if (error) {
+      setAssignmentsLoaded(false);
+      toast({ title: 'Gagal memuat cabang double job', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const next: Record<string, string[]> = {};
+    assigned?.forEach(a => { (next[a.user_id] ??= []).push(a.outlet_id); });
+    setAssignments(next);
+    setAssignmentsLoaded(true);
+  };
+
+  const openEdit = (p: StaffProfile) => {
+    setExtraOutletIds(assignments[p.user_id] || []);
+    setEditProfile({ ...p });
   };
 
   useEffect(() => { fetchProfiles(); }, []);
@@ -77,6 +98,17 @@ export default function StaffManagement() {
       })
       .eq('id', editProfile.id);
 
+    if (!error && canAssign) {
+      const { error: assignmentError } = await supabase.rpc('set_employee_attendance_outlets', {
+        _user_id: editProfile.user_id,
+        _outlet_ids: extraOutletIds.filter(id => id !== editProfile.outlet_id),
+      });
+      if (assignmentError) {
+        setSaving(false);
+        toast({ title: 'Cabang double job gagal disimpan', description: assignmentError.message, variant: 'destructive' });
+        return;
+      }
+    }
     setSaving(false);
     if (error) {
       toast({ title: 'Gagal menyimpan', description: error.message, variant: 'destructive' });
@@ -142,7 +174,7 @@ export default function StaffManagement() {
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2 justify-end">
-                  <Button variant="outline" size="sm" className="h-8" onClick={() => setEditProfile({ ...p })}>
+                  <Button variant="outline" size="sm" className="h-8" onClick={() => openEdit(p)}>
                     <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                   </Button>
                   {canDelete && (
@@ -216,7 +248,7 @@ export default function StaffManagement() {
                         </Badge>
                       </td>
                       <td className="p-4 flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setEditProfile({ ...p })}>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
                         {canDelete && (
@@ -342,6 +374,23 @@ export default function StaffManagement() {
                   </Select>
                 </div>
 
+                {canAssign && (
+                  <div className="space-y-2 border-t border-border pt-4">
+                    <Label>Cabang Double Job</Label>
+                    {!assignmentsLoaded ? <p className="text-sm text-destructive">Cabang tambahan belum berhasil dimuat.</p> : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {outlets.filter(o => o.id !== editProfile.outlet_id && o.name !== 'Manajemen').map(o => (
+                          <label key={o.id} className="flex items-center gap-2 text-sm break-words">
+                            <Checkbox checked={extraOutletIds.includes(o.id)} onCheckedChange={checked =>
+                              setExtraOutletIds(ids => checked === true ? [...ids, o.id] : ids.filter(id => id !== o.id))} />
+                            {o.name}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Komponen Gaji - terhubung ke Payroll */}
                 <div className="border-t border-border pt-4 space-y-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -384,7 +433,7 @@ export default function StaffManagement() {
                   </div>
                 </div>
 
-                <Button className="w-full" onClick={handleSave} disabled={saving}>
+                <Button className="w-full" onClick={handleSave} disabled={saving || (canAssign && !assignmentsLoaded)}>
                   {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
                 </Button>
               </div>

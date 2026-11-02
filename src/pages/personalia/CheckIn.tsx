@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Camera, MapPin, Clock, RefreshCw, LogIn, LogOut, AlertTriangle, CheckCircle2, ExternalLink, Building2, Briefcase } from 'lucide-react';
 import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
+import { allowedAttendanceOutlets } from '@/lib/attendanceOutlets';
 
 interface ProfileLite {
   full_name: string;
@@ -65,6 +66,8 @@ export default function CheckInPage() {
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [logFilter, setLogFilter] = useState<'all' | 'check_in' | 'check_out'>('all');
   const [allOutlets, setAllOutlets] = useState<OutletOption[]>([]);
+  const [additionalOutletIds, setAdditionalOutletIds] = useState<string[]>([]);
+  const [outletsReady, setOutletsReady] = useState(false);
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
   const [selectedShift, setSelectedShift] = useState<string>('');
   const [attendanceStatus, setAttendanceStatus] = useState<'H' | 'I' | 'S' | 'C' | 'L'>('H');
@@ -79,6 +82,7 @@ export default function CheckInPage() {
   const isPresent = attendanceStatus === 'H';
 
   const canChooseOutlet = role === 'admin' || role === 'management';
+  const availableOutlets = allowedAttendanceOutlets(allOutlets, role, profile?.outlet_id ?? null, additionalOutletIds);
   const { shiftsForOutlet, resolve: resolveThresholds } = useAttendanceThresholds();
   // Shift hanya yang dikonfigurasi untuk outlet aktif (atau fallback global bawaan dari hook).
   // Hilangkan shift "Default" dari pilihan user — user wajib memilih shift nyata yang dikonfigurasi.
@@ -94,7 +98,6 @@ export default function CheckInPage() {
 
   // Load all outlets for admin/management
   useEffect(() => {
-    if (!canChooseOutlet) return;
     (async () => {
       const { data } = await supabase
         .from('outlets')
@@ -103,12 +106,20 @@ export default function CheckInPage() {
         .order('name');
       if (data) setAllOutlets(data as OutletOption[]);
     })();
-  }, [canChooseOutlet]);
+  }, []);
 
   // Load profile + outlet info
   useEffect(() => {
     if (!user) return;
     (async () => {
+      setOutletsReady(false);
+      const { data: assigned, error: assignmentError } = await supabase
+        .from('employee_attendance_outlets').select('outlet_id').eq('user_id', user.id);
+      if (assignmentError) {
+        toast({ title: 'Gagal memuat cabang absen', description: assignmentError.message, variant: 'destructive' });
+        return;
+      }
+      setAdditionalOutletIds((assigned || []).map(a => a.outlet_id));
       const { data: prof } = await supabase
         .from('profiles')
         .select('full_name, outlet_id')
@@ -127,6 +138,7 @@ export default function CheckInPage() {
       setProfile({ full_name: prof.full_name, outlet_id: prof.outlet_id, ...outletData });
       // Default selected outlet to profile outlet if any
       if (prof.outlet_id) setSelectedOutletId(prof.outlet_id);
+      setOutletsReady(true);
     })();
   }, [user]);
 
@@ -228,17 +240,7 @@ export default function CheckInPage() {
   };
 
   // Resolve effective outlet (admin/management uses selected; others use profile)
-  const effectiveOutlet = canChooseOutlet
-    ? allOutlets.find((o) => o.id === selectedOutletId) || null
-    : profile?.outlet_id
-      ? {
-          id: profile.outlet_id,
-          name: profile.outlet_name || '',
-          latitude: profile.outlet_lat ?? null,
-          longitude: profile.outlet_lng ?? null,
-          radius_meters: profile.outlet_radius ?? null,
-        }
-      : null;
+  const effectiveOutlet = availableOutlets.find(o => o.id === selectedOutletId) || null;
 
   // Compute distance + warning
   const distance =
@@ -257,11 +259,11 @@ export default function CheckInPage() {
       toast({ title: 'Data belum lengkap', description: 'Pastikan lokasi GPS sudah terdeteksi.', variant: 'destructive' });
       return;
     }
-    if (canChooseOutlet && !selectedOutletId) {
-      toast({ title: 'Pilih outlet dulu', description: 'Sebagai admin/management, pilih cabang tempat absen.', variant: 'destructive' });
+    if (!outletsReady || !effectiveOutlet) {
+      toast({ title: 'Pilih cabang tempat absen', description: 'Pilih cabang utama atau cabang double job yang ditugaskan admin.', variant: 'destructive' });
       return;
     }
-    if (!selectedShift) {
+    if (!selectedShift || !availableShifts.includes(selectedShift)) {
       toast({ title: 'Pilih shift dulu', description: 'Shift wajib dipilih agar status absen dapat dievaluasi.', variant: 'destructive' });
       return;
     }
@@ -284,7 +286,7 @@ export default function CheckInPage() {
         user_id: user.id,
         outlet_id: effectiveOutlet?.id || null,
         log_type: effectiveLogType,
-        shift_name: selectedShift || 'Default',
+        shift_name: selectedShift,
         selfie_url: publicUrl,
         latitude: coords.coords.latitude,
         longitude: coords.coords.longitude,
@@ -363,25 +365,22 @@ export default function CheckInPage() {
         </Card>
 
         {/* Outlet selector for admin/management */}
-        {canChooseOutlet && (
+        {(canChooseOutlet || availableOutlets.length > 1) && (
           <Card className="glass-card border-primary/30">
             <CardContent className="p-4 space-y-2">
-              <Label className="flex items-center gap-2">
+              <Label htmlFor="attendance-outlet" className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" /> Pilih Cabang Tempat Absen
               </Label>
               <Select value={selectedOutletId || ''} onValueChange={(v) => setSelectedOutletId(v)}>
-                <SelectTrigger>
+                <SelectTrigger id="attendance-outlet">
                   <SelectValue placeholder="Pilih outlet..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {allOutlets.map((o) => (
+                  {availableOutlets.map((o) => (
                     <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Sebagai {role}, Anda dapat absen di cabang manapun. Validasi radius tetap berlaku per outlet yang dipilih.
-              </p>
             </CardContent>
           </Card>
         )}
@@ -561,7 +560,7 @@ export default function CheckInPage() {
               </div>
               <Button
                 onClick={handleSubmit}
-                disabled={submitting || (!isPresent && !notes.trim())}
+                disabled={submitting || !outletsReady || !effectiveOutlet || !selectedShift || !availableShifts.includes(selectedShift) || (!isPresent && !notes.trim())}
                 className="w-full"
                 size="lg"
               >
