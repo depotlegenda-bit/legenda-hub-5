@@ -1,6 +1,7 @@
 # Tasks
-- [ ] Add admin-managed secondary employee outlets and assigned-outlet selfie attendance.
-- [ ] Verify assignment permissions, outlet selection, and attendance recording.
+- [x] Add admin-managed secondary employee outlets and assigned-outlet selfie attendance.
+- [x] Verify assignment rules with tests and admin assignment persistence after refresh through the signed-in page.
+- [ ] Verify a crew selfie submission at an assigned secondary outlet (blocked: current session is admin; no real crew selfie/GPS supplied).
 - [x] Add standalone HPP menu using the uploaded calculator source without changing other menus.
 - [x] Verify calculator operations and persistence.
 - [x] Add CSV template downloads in both HPP input forms; confirm files are served and accepted by the importer.
