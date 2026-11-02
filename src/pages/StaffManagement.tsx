@@ -288,12 +288,41 @@ export default function StaffManagement() {
         </Card>
 
         <Dialog open={!!editProfile} onOpenChange={(open) => !open && setEditProfile(null)}>
-          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle className="font-heading">Edit Profil: {editProfile?.full_name}</DialogTitle>
             </DialogHeader>
             {editProfile && (
-              <div className="space-y-4 overflow-y-auto pr-2 flex-1">
+              <div className="space-y-4 overflow-y-auto min-h-0 pr-2 flex-1">
+                <div className="space-y-2">
+                  <Label>Outlet / Cabang Utama</Label>
+                  <Select value={editProfile.outlet_id || ''} onValueChange={(v) => setEditProfile({ ...editProfile, outlet_id: v || null })}>
+                    <SelectTrigger><SelectValue placeholder="Pilih outlet" /></SelectTrigger>
+                    <SelectContent>
+                      {outlets.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {canAssign && (
+                  <div className="space-y-2 border-b border-border pb-4">
+                    <Label>Cabang Double Job</Label>
+                    {!assignmentsLoaded ? <p className="text-sm text-destructive">Cabang tambahan belum berhasil dimuat.</p> : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {outlets.filter(o => o.id !== editProfile.outlet_id && o.name !== 'Manajemen').map(o => (
+                          <label key={o.id} className="flex items-center gap-2 text-sm break-words">
+                            <Checkbox checked={extraOutletIds.includes(o.id)} onCheckedChange={checked =>
+                              setExtraOutletIds(ids => checked === true ? [...ids, o.id] : ids.filter(id => id !== o.id))} />
+                            {o.name}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Nama Panggilan</Label>
@@ -362,35 +391,6 @@ export default function StaffManagement() {
                     <Input type="date" value={editProfile.contract_end_date || ''} onChange={(e) => setEditProfile({ ...editProfile, contract_end_date: e.target.value || null })} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Outlet / Cabang</Label>
-                  <Select value={editProfile.outlet_id || ''} onValueChange={(v) => setEditProfile({ ...editProfile, outlet_id: v || null })}>
-                    <SelectTrigger><SelectValue placeholder="Pilih outlet" /></SelectTrigger>
-                    <SelectContent>
-                      {outlets.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {canAssign && (
-                  <div className="space-y-2 border-t border-border pt-4">
-                    <Label>Cabang Double Job</Label>
-                    {!assignmentsLoaded ? <p className="text-sm text-destructive">Cabang tambahan belum berhasil dimuat.</p> : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {outlets.filter(o => o.id !== editProfile.outlet_id && o.name !== 'Manajemen').map(o => (
-                          <label key={o.id} className="flex items-center gap-2 text-sm break-words">
-                            <Checkbox checked={extraOutletIds.includes(o.id)} onCheckedChange={checked =>
-                              setExtraOutletIds(ids => checked === true ? [...ids, o.id] : ids.filter(id => id !== o.id))} />
-                            {o.name}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Komponen Gaji - terhubung ke Payroll */}
                 <div className="border-t border-border pt-4 space-y-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
