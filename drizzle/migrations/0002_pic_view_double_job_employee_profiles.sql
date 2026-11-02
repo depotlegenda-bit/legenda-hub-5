@@ -1,0 +1,1 @@
+CREATE POLICY "PIC view double job employee profiles" ON public.profiles FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'pic') AND EXISTS (SELECT 1 FROM public.employee_attendance_outlets a WHERE a.user_id = profiles.user_id AND public.pic_can_access_outlet(a.outlet_id)));
