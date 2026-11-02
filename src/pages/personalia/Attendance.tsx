@@ -81,6 +81,7 @@ interface Profile {
   full_name: string;
   job_title: string;
   outlet_id: string | null;
+  attendance_outlet_ids?: string[];
 }
 
 interface RowState {
@@ -143,16 +144,19 @@ export default function AttendancePage() {
 
   // Fetch profiles once
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('user_id, full_name, job_title, outlet_id')
-      .order('full_name')
-      .then(({ data }) => { if (data) setProfiles(data as Profile[]); });
+    Promise.all([
+      supabase.from('profiles').select('user_id, full_name, job_title, outlet_id').order('full_name'),
+      supabase.from('employee_attendance_outlets').select('user_id,outlet_id'),
+    ]).then(([prof, assigned]) => {
+      if (prof.data) setProfiles(prof.data.map(p => ({ ...p,
+        attendance_outlet_ids: (assigned.data || []).filter(a => a.user_id === p.user_id).map(a => a.outlet_id),
+      })));
+    });
   }, []);
 
   // Filter karyawan per outlet
   const outletProfiles = useMemo(
-    () => profiles.filter((p) => p.outlet_id === selectedOutlet),
+    () => profiles.filter((p) => p.outlet_id === selectedOutlet || p.attendance_outlet_ids?.includes(selectedOutlet)),
     [profiles, selectedOutlet]
   );
 
@@ -488,6 +492,7 @@ function RecapTab({
         .select('*')
         .gte('attendance_date', start)
         .lte('attendance_date', end)
+        .eq('outlet_id', outletId)
         .in('user_id', userIds)
         .order('attendance_date', { ascending: false }),
       supabase
@@ -495,6 +500,7 @@ function RecapTab({
         .select('id,user_id,log_type,created_at,outlet_id,shift_name,status_override,status_override_note,notes')
         .gte('created_at', startLocal.toISOString())
         .lte('created_at', endLocal.toISOString())
+        .eq('outlet_id', outletId)
         .in('user_id', userIds),
     ]).then(([attRes, logsRes]) => {
       const manual = (attRes.data || []) as any[];
@@ -1010,7 +1016,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const isUserExempt = (userId: string) => (rolesByUser[userId] || []).some((r) => isRoleExempt(r));
 
   const visibleProfiles = useMemo(
-    () => outletFilter === 'all' ? allProfiles : allProfiles.filter((p) => p.outlet_id === outletFilter),
+    () => outletFilter === 'all' ? allProfiles : allProfiles.filter((p) => p.outlet_id === outletFilter || p.attendance_outlet_ids?.includes(outletFilter)),
     [allProfiles, outletFilter]
   );
 
@@ -1040,6 +1046,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const profileMap = useMemo(() => new Map(allProfiles.map((p) => [p.user_id, p])), [allProfiles]);
   const outletMap = useMemo(() => new Map(outlets.map((o) => [o.id, o.name])), [outlets]);
   const filtered = logs
+    .filter((l) => outletFilter === 'all' || l.outlet_id === outletFilter)
     .filter((l) => userFilter === 'all' || l.user_id === userFilter)
     .filter((l) => typeFilter === 'all' || l.log_type === typeFilter);
 

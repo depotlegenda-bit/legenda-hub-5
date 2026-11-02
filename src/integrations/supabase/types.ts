@@ -407,6 +407,42 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_attendance_outlets: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          outlet_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          outlet_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          outlet_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_attendance_outlets_outlet_id_fkey"
+            columns: ["outlet_id"]
+            isOneToOne: false
+            referencedRelation: "outlets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_attendance_outlets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       expense_categories: {
         Row: {
           created_at: string | null
@@ -1589,6 +1625,10 @@ export type Database = {
       hpp_has_permission: { Args: { action: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       pic_can_access_outlet: { Args: { _outlet_id: string }; Returns: boolean }
+      set_employee_attendance_outlets: {
+        Args: { _outlet_ids: string[]; _user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "staff" | "management" | "pic" | "crew" | "stockman" | "admin"

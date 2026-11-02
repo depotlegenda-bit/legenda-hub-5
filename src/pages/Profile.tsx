@@ -48,6 +48,7 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [doubleJobNames, setDoubleJobNames] = useState<string[]>([]);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ start_date: '', end_date: '', reason: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -85,6 +86,9 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user) return;
     const loadProfile = async () => {
+      const { data: assignments } = await supabase.from('employee_attendance_outlets')
+        .select('outlets(name)').eq('user_id', user.id);
+      setDoubleJobNames((assignments || []).flatMap(a => a.outlets?.name ? [a.outlets.name] : []));
       const { data, error } = await supabase
         .from('profiles')
         .select('full_name, nickname, phone, address, date_of_birth, job_title, discipline_points, warning_letter_status, employment_status, contract_end_date, nik, join_date, outlet_id, outlets(name)')
@@ -216,6 +220,7 @@ export default function ProfilePage() {
     { icon: CalendarDays, label: 'Tanggal Lahir', value: profile.date_of_birth ? format(new Date(profile.date_of_birth), 'dd MMM yyyy') : '-' },
     { icon: Briefcase, label: 'Jabatan', value: profile.job_title || '-' },
     { icon: Store, label: 'Cabang', value: profile.outlet_name || '-' },
+    ...(doubleJobNames.length ? [{ icon: Store, label: 'Cabang Double Job', value: doubleJobNames.join(', ') }] : []),
     { icon: IdCard, label: 'NIK', value: profile.nik || '-' },
     { icon: CalendarDays, label: 'Tanggal Bergabung', value: profile.join_date ? format(new Date(profile.join_date), 'MMMM yyyy', { locale: idLocale }) : '-' },
   ];
