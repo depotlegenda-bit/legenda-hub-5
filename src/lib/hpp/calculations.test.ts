@@ -55,4 +55,28 @@ describe('HPP calculator from supplied source', () => {
     expect(() => importHppCsv(MATERIAL_HEADER.join(',') + '\nNew,Bahan Utama,1000,pcs,1\nInvalid,Bahan Utama,1000,pcs,0', 'materials', materials, [])).toThrow('Baris 3');
     expect(materials).toHaveLength(8);
   });
+  it.each(['90.000', 'Rp 90.000', 'Rp. 90.000,00', '90,000.00'])('reads formatted purchase price %s as 90000', price => {
+    const result = importHppCsv(MATERIAL_HEADER.join(';') + `\nTest;Bahan Utama;${price};kg;0,5`, 'materials', [], []);
+    expect(result.materials[0].buyPrice).toBe(90000);
+    expect(result.materials[0].costPerBaseUnit).toBe(180);
+  });
+  it('accepts unit abbreviations without misreporting valid quantities as zero', () => {
+    const result = importHppCsv(MATERIAL_HEADER.join(';') + '\nTest;Bahan Utama;90000;gr;500', 'materials', [], []);
+    expect(result.materials[0].buyUnit).toBe('gram');
+    expect(result.materials[0].costPerBaseUnit).toBe(180);
+  });
+  it('keeps decimal-dot recipe quantities and decimal-comma quantities positive', () => {
+    const result = importHppCsv(PRODUCT_HEADER.join(';') + '\nTest;Minuman;60;22.000;1.000;Biji Kopi Arabika Espresso Blend;0.018;kg\nTest;Minuman;60;22.000;1.000;Susu UHT Full Cream;0,12;l', 'products', SAMPLE_MATERIALS, []);
+    expect(result.products[0].ingredients.map(i => i.qty)).toEqual([0.018, 0.12]);
+    expect(calculateHpp(result.products[0], result.materials).totalHPP).toBe(6580);
+  });
+  it('identifies invalid units separately from valid amounts', () => {
+    expect(() => importHppCsv(MATERIAL_HEADER.join(';') + '\nTest;Bahan Utama;90000;karung;1', 'materials', [], [])).toThrow('Satuan Beli "karung" tidak dikenali');
+  });
+  it('reports shifted columns instead of blaming a valid number', () => {
+    expect(() => importHppCsv(MATERIAL_HEADER.join(',') + '\nTest,Bahan Utama,90,000,kg,1', 'materials', [], [])).toThrow('Jumlah kolom harus 5; ditemukan 6');
+  });
+  it('reports the failing recipe row including blank separator rows', () => {
+    expect(() => importHppCsv(PRODUCT_HEADER.join(';') + '\n\nTest;Minuman;60;22000;1000;Biji Kopi Arabika Espresso Blend;0;gram', 'products', SAMPLE_MATERIALS, [])).toThrow('Baris 3: Jumlah Bahan');
+  });
 });

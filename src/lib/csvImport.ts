@@ -49,7 +49,7 @@ function detectDelimiter(text: string): string {
  * - CR/LF line endings
  * - auto-detection of `,`, `;` or tab as delimiter (Excel locale-friendly)
  */
-export function parseCSV(text: string, delimiter?: string): string[][] {
+export function parseCSV(text: string, delimiter?: string, keepEmptyRows = false): string[][] {
   // Strip BOM if present
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const delim = delimiter || detectDelimiter(text);
@@ -85,7 +85,7 @@ export function parseCSV(text: string, delimiter?: string): string[][] {
       row.push(cell);
       cell = '';
       // skip empty trailing rows
-      if (row.length > 1 || row[0] !== '') rows.push(row);
+      if (keepEmptyRows || row.length > 1 || row[0] !== '') rows.push(row);
       row = [];
     } else {
       cell += ch;
