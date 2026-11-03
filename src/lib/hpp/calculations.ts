@@ -18,6 +18,12 @@ export function baseUnitInfo(unit: string, price: number, qty: number) {
 export function compatibleUnits(baseUnit: string) {
   return baseUnit === 'gram' ? ['gram', 'kg'] : baseUnit === 'ml' ? ['ml', 'liter'] : [baseUnit];
 }
+export function clearHppCollection<T extends { materials: Material[]; products: Product[] }>(data: T, collection: 'materials' | 'products'): T {
+  if (collection === 'materials' && data.products.some(p => p.ingredients.length > 0)) {
+    throw new Error('Bahan masih digunakan dalam resep. Hapus semua resep terlebih dahulu sebelum menghapus semua bahan baku.');
+  }
+  return { ...data, [collection]: [] };
+}
 export function calculateHpp(product: Product, materials: Material[]) {
   const breakdown = product.ingredients.map(ingredient => {
     const material = materials.find(m => m.id === ingredient.materialId);

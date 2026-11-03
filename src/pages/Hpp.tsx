@@ -14,7 +14,7 @@ import { Field, selectClass, MaterialEditor, ProductEditor } from '@/components/
 import { useAuth } from '@/hooks/useAuth';
 import { useMenuPermissions } from '@/hooks/useMenuPermissions';
 import { useHppData } from '@/hooks/useHppData';
-import { calculateHpp, calculateBep, rupiah, type Material, type Product } from '@/lib/hpp/calculations';
+import { calculateHpp, calculateBep, clearHppCollection, rupiah, type Material, type Product } from '@/lib/hpp/calculations';
 import { downloadCsv, importHppCsv } from '@/lib/hpp/csv';
 import { SAMPLE_MATERIALS, SAMPLE_PRODUCTS } from '@/lib/hpp/sampleData';
 
@@ -49,6 +49,16 @@ function HppWorkspace({ outletId, outletName }: { outletId: string; outletName: 
   const selected = calculated.find(p => p.product.id === bepProduct);
   const bep = selected ? calculateBep(fixedCost, selected.calc.profitPerUnit, selected.calc.actualPrice) : null;
   const commit = async (next: typeof data) => { const ok = await save(next); if (ok) toast.success('Data HPP tersimpan'); return ok; };
+  const confirmClear = (collection: 'materials' | 'products') => {
+    if (!can('can_delete')) return;
+    try {
+      clearHppCollection(data, collection);
+      setConfirm({
+        title: `Hapus semua ${collection === 'materials' ? 'bahan baku' : 'resep'} HPP di ${outletName}?`,
+        run: () => can('can_delete') ? commit(clearHppCollection(data, collection)) : false,
+      });
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Data tidak dapat dihapus.'); }
+  };
   const exportData = () => downloadCsv('HPP.csv', [['Nama Menu', 'Kategori', 'Biaya Bahan (Rp)', 'Biaya Operasional (Rp)', 'Total HPP (Rp)', 'Harga Jual (Rp)', 'Margin Profit (%)', 'Food Cost (%)'], ...visibleProducts.map(({ product: p, calc: c }) => [p.name, p.category, c.ingredientCost, p.overheadCostPerUnit, c.totalHPP, c.actualPrice, c.actualMarginPercent.toFixed(2), c.foodCostPercent.toFixed(2)])]);
   if (dataLoading) return <p role="status">Memuat HPP {outletName}…</p>;
   if (error) return <div role="alert" className="space-y-3"><p className="text-destructive">{error}</p><Button variant="outline" onClick={retry}>Coba Lagi</Button></div>;
@@ -62,6 +72,7 @@ function HppWorkspace({ outletId, outletName }: { outletId: string; outletName: 
     <Tabs value={tab} onValueChange={value => { setTab(value); setSearch(''); }}><TabsList className="grid h-auto w-full grid-cols-1 gap-1 bg-muted p-1 sm:grid-cols-2 xl:grid-cols-4 [&>button]:w-full [&>button]:justify-start [&>button]:whitespace-normal">
       <TabsTrigger value="products" className="gap-2"><Utensils className="h-4 w-4" />Resep & HPP Menu ({products.length})</TabsTrigger><TabsTrigger value="materials" className="gap-2"><Package className="h-4 w-4" />Harga Bahan Baku ({materials.length})</TabsTrigger><TabsTrigger value="bep" className="gap-2"><TrendingUp className="h-4 w-4" />Simulasi BEP</TabsTrigger><TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" />Profitabilitas</TabsTrigger>
     </TabsList></Tabs>
+    {(tab === 'materials' || tab === 'products') && can('can_delete') && <div className="flex justify-end"><Button variant="destructive" size="sm" disabled={!(tab === 'materials' ? materials.length : products.length)} onClick={() => confirmClear(tab === 'materials' ? 'materials' : 'products')}><Trash2 />{tab === 'materials' ? 'Hapus Semua Bahan Baku' : 'Hapus Semua Resep'}</Button></div>}
     {(tab === 'products' || tab === 'materials' || tab === 'analytics') && <div className="flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Cari menu atau bahan" className="pl-9" placeholder="Cari nama atau kategori…" value={search} onChange={e => setSearch(e.target.value)} /></div>{can('can_create') && tab !== 'analytics' && <Button onClick={() => tab === 'materials' ? setMaterialEdit('new') : setProductEdit('new')}><Plus />{tab === 'materials' ? 'Tambah Bahan Baku' : 'Buat Resep Menu Baru'}</Button>}</div>}
     {tab === 'products' && <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">{visibleProducts.map(({ product, calc }) => <article key={product.id} className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
       <div className="space-y-4 p-5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><span className="text-xs text-muted-foreground">{product.category}</span><h2 className="mt-1 break-words text-lg font-semibold">{product.name}</h2><p className="mt-1 text-xs text-muted-foreground">{product.ingredients.length} bahan</p></div><div className="flex shrink-0">{can('can_edit') && <Button size="icon" variant="ghost" title="Edit Menu" aria-label={`Edit ${product.name}`} onClick={() => setProductEdit(product)}><Pencil /></Button>}{can('can_delete') && <Button size="icon" variant="ghost" title="Hapus Menu" aria-label={`Hapus ${product.name}`} onClick={() => setConfirm({ title: `Hapus menu ${product.name}?`, run: () => commit({ ...data, products: products.filter(p => p.id !== product.id) }) })}><Trash2 className="text-destructive" /></Button>}</div></div>

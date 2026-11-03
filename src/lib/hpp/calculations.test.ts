@@ -1,9 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { baseUnitInfo, calculateHpp, calculateBep, validateProduct } from './calculations';
+import { baseUnitInfo, calculateHpp, calculateBep, validateProduct, clearHppCollection } from './calculations';
 import { SAMPLE_MATERIALS, SAMPLE_PRODUCTS } from './sampleData';
 import { importHppCsv, MATERIAL_HEADER, PRODUCT_HEADER } from './csv';
 
 describe('HPP calculator from supplied source', () => {
+  it('clears all recipes while retaining materials and fixed costs', () => {
+    const data = { materials: SAMPLE_MATERIALS, products: SAMPLE_PRODUCTS, fixedCost: 8000000 };
+    expect(clearHppCollection(data, 'products')).toEqual({ materials: SAMPLE_MATERIALS, products: [], fixedCost: 8000000 });
+    expect(data.products).toHaveLength(2);
+  });
+  it('clears all materials while retaining fixed costs when recipes are empty', () => {
+    expect(clearHppCollection({ materials: SAMPLE_MATERIALS, products: [], fixedCost: 8000000 }, 'materials')).toEqual({ materials: [], products: [], fixedCost: 8000000 });
+  });
+  it('prevents deleting materials still referenced by recipes', () => {
+    expect(() => clearHppCollection({ materials: SAMPLE_MATERIALS, products: SAMPLE_PRODUCTS }, 'materials')).toThrow('Hapus semua resep terlebih dahulu');
+  });
   it('converts 1 kg bought at 180000 into 180 per gram', () => {
     expect(baseUnitInfo('kg', 180000, 1)).toEqual({ baseUnit: 'gram', costPerBaseUnit: 180 });
   });
