@@ -1,4 +1,5 @@
 # Tasks
+- [ ] Fix HPP CSV formatted amounts, unit handling, and precise row validation; verify regression tests and signed-in import.
 - [x] Add admin-managed secondary employee outlets and assigned-outlet selfie attendance.
 - [x] Verify assignment rules with tests and admin assignment persistence after refresh through the signed-in page.
 - [ ] Verify a crew selfie submission at an assigned secondary outlet (blocked: current session is admin; no real crew selfie/GPS supplied).
