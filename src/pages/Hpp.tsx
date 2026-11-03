@@ -55,7 +55,7 @@ function HppWorkspace({ outletId, outletName }: { outletId: string; outletName: 
       clearHppCollection(data, collection);
       setConfirm({
         title: `Hapus semua ${collection === 'materials' ? 'bahan baku' : 'resep'} HPP di ${outletName}?`,
-        run: () => can('can_delete') ? commit(clearHppCollection(data, collection)) : false,
+        run: async () => can('can_delete') ? commit(clearHppCollection(data, collection)) : false,
       });
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Data tidak dapat dihapus.'); }
   };
