@@ -1,4 +1,4 @@
-export const UNITS = ['kg', 'gram', 'liter', 'ml', 'pcs', 'pack'] as const;
+export const UNITS = ['kg', 'gram', 'liter', 'ml', 'pcs', 'pack', 'kotak', 'botol', 'dus'] as const;
 export type Unit = typeof UNITS[number];
 export interface Material {
   id: string; name: string; category: string; buyUnit: string; buyPrice: number; buyQty: number;
