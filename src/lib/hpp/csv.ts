@@ -3,7 +3,7 @@ import { baseUnitInfo, validateProduct, type Material, type Product } from './ca
 
 export const MATERIAL_HEADER = ['Nama Bahan', 'Kategori', 'Harga Beli', 'Satuan Beli', 'Jumlah Pembelian'];
 export const PRODUCT_HEADER = ['Nama Menu', 'Kategori', 'Target Margin (%)', 'Harga Jual (Rp)', 'Biaya Operasional (Rp)', 'Nama Bahan', 'Jumlah Bahan', 'Satuan Bahan'];
-function number(value: string) {
+function number(value: string, currency = false) {
   let text = value.trim().replace(/^Rp\.?\s*/i, '').replace(/\s/g, '');
   if (!text) return 0;
   // Currency uses Indonesian grouping; quantities also accept decimal dots.
@@ -12,7 +12,7 @@ function number(value: string) {
     text = text.lastIndexOf(',') > text.lastIndexOf('.')
       ? text.replace(/\./g, '').replace(',', '.')
       : text.replace(/,/g, '');
-  } else if (/^[+-]?\d{1,3}(\.\d{3})+$/.test(text)) {
+  } else if (currency && /^[+-]?[1-9]\d{0,2}(\.\d{3})+$/.test(text)) {
     text = text.replace(/\./g, '');
   } else {
     text = text.replace(',', '.');
@@ -28,7 +28,7 @@ function unit(value: string) {
   return aliases[normalized] ?? normalized;
 }
 export function importHppCsv(text: string, mode: 'materials' | 'products', materials: Material[], products: Product[]) {
-  const rows = parseCSV(text).map((cells, index) => ({ cells, line: index + 1 })).filter(row => row.cells.some(cell => cell.trim()));
+  const rows = parseCSV(text, undefined, true).map((cells, index) => ({ cells, line: index + 1 })).filter(row => row.cells.some(cell => cell.trim()));
   const headers = mode === 'materials' ? MATERIAL_HEADER : PRODUCT_HEADER;
   if (rows.length < 2 || headers.some((h, index) => rows[0].cells[index]?.trim().toLowerCase() !== h.toLowerCase())) throw new Error('Kolom CSV tidak sesuai template atau file kosong.');
   const newMaterials = [...materials]; const newProducts = [...products];
@@ -41,7 +41,7 @@ export function importHppCsv(text: string, mode: 'materials' | 'products', mater
       if (!name) throw new Error('Nama wajib diisi.');
       if (mode === 'materials') {
         if (!row[2]?.trim() || !row[4]?.trim()) throw new Error('Harga dan jumlah pembelian wajib diisi.');
-        const buyPrice = number(row[2]); const buyQty = number(row[4]); const buyUnit = unit(row[3]);
+        const buyPrice = number(row[2], true); const buyQty = number(row[4]); const buyUnit = unit(row[3]);
         if (buyPrice < 0) throw new Error(`Harga Beli tidak boleh negatif (terbaca: ${buyPrice}).`);
         if (buyQty <= 0) throw new Error(`Jumlah Pembelian harus lebih dari 0 (terbaca: ${buyQty}).`);
         if (!['kg', 'gram', 'liter', 'ml', 'pcs', 'pack'].includes(buyUnit)) throw new Error(`Satuan Beli "${row[3]}" tidak dikenali. Gunakan kg, gram, liter, ml, pcs, atau pack.`);
@@ -54,7 +54,7 @@ export function importHppCsv(text: string, mode: 'materials' | 'products', mater
         count++;
       } else {
         const key = name.toLowerCase();
-        const config = { category: row[1].trim() || 'Makanan Utama', targetMargin: row[2]?.trim() ? number(row[2]) : 60, customSellingPrice: number(row[3] || ''), overheadCostPerUnit: number(row[4] || '') };
+        const config = { category: row[1].trim() || 'Makanan Utama', targetMargin: row[2]?.trim() ? number(row[2]) : 60, customSellingPrice: number(row[3] || '', true), overheadCostPerUnit: number(row[4] || '', true) };
         let product = productMap.get(key);
         if (!product) {
           product = { id: products.find(p => p.name.toLowerCase() === key)?.id ?? crypto.randomUUID(), name, ...config, ingredients: [] };
