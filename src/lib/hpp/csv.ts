@@ -1,5 +1,5 @@
 import { parseCSV } from '@/lib/csvImport';
-import { baseUnitInfo, validateProduct, type Material, type Product } from './calculations';
+import { UNITS, baseUnitInfo, validateProduct, type Material, type Product, type Unit } from './calculations';
 
 export const MATERIAL_HEADER = ['Nama Bahan', 'Kategori', 'Harga Beli', 'Satuan Beli', 'Jumlah Pembelian'];
 export const PRODUCT_HEADER = ['Nama Menu', 'Kategori', 'Target Margin (%)', 'Harga Jual (Rp)', 'Biaya Operasional (Rp)', 'Nama Bahan', 'Jumlah Bahan', 'Satuan Bahan'];
@@ -44,7 +44,7 @@ export function importHppCsv(text: string, mode: 'materials' | 'products', mater
         const buyPrice = number(row[2], true); const buyQty = number(row[4]); const buyUnit = unit(row[3]);
         if (buyPrice < 0) throw new Error(`Harga Beli tidak boleh negatif (terbaca: ${buyPrice}).`);
         if (buyQty <= 0) throw new Error(`Jumlah Pembelian harus lebih dari 0 (terbaca: ${buyQty}).`);
-        if (!['kg', 'gram', 'liter', 'ml', 'pcs', 'pack'].includes(buyUnit)) throw new Error(`Satuan Beli "${row[3]}" tidak dikenali. Gunakan kg, gram, liter, ml, pcs, atau pack.`);
+        if (!UNITS.includes(buyUnit as Unit)) throw new Error(`Satuan Beli "${row[3]}" tidak dikenali. Gunakan ${UNITS.join(', ')}.`);
         const existingIndex = newMaterials.findIndex(m => m.name.toLowerCase() === name.toLowerCase());
         const info = baseUnitInfo(buyUnit, buyPrice, buyQty);
         const existing = newMaterials[existingIndex];

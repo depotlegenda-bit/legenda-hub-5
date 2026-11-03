@@ -73,6 +73,14 @@ describe('HPP calculator from supplied source', () => {
   it('identifies invalid units separately from valid amounts', () => {
     expect(() => importHppCsv(MATERIAL_HEADER.join(';') + '\nTest;Bahan Utama;90000;karung;1', 'materials', [], [])).toThrow('Satuan Beli "karung" tidak dikenali');
   });
+  it.each(['kotak', 'botol', 'dus'])('imports %s and uses its per-package cost in recipes', unit => {
+    const imported = importHppCsv(MATERIAL_HEADER.join(';') + `\nTest;Bahan Utama;90000; ${unit.toUpperCase()} ;3`, 'materials', [], []);
+    expect(imported.materials[0].buyUnit).toBe(unit);
+    expect(imported.materials[0].baseUnit).toBe(unit);
+    expect(imported.materials[0].costPerBaseUnit).toBe(30000);
+    const recipe = importHppCsv(PRODUCT_HEADER.join(';') + `\nMenu;Minuman;60;22000;0;Test;0,5;${unit}`, 'products', imported.materials, []);
+    expect(calculateHpp(recipe.products[0], recipe.materials).totalHPP).toBe(15000);
+  });
   it('reports shifted columns instead of blaming a valid number', () => {
     expect(() => importHppCsv(MATERIAL_HEADER.join(',') + '\nTest,Bahan Utama,90,000,kg,1', 'materials', [], [])).toThrow('Jumlah kolom harus 5; ditemukan 6');
   });
