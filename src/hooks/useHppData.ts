@@ -40,7 +40,7 @@ export function useHppData(outletId: string) {
     try {
       const { data: row, error: saveError } = await supabase.from('hpp_outlet_workspaces').update({
         materials: next.materials as unknown as Json, products: next.products as unknown as Json, fixed_cost: next.fixedCost,
-      }).eq('outlet_id', outletId).eq('version', version.current).select('version').maybeSingle();
+      }).eq('outlet_id', outletId).eq('version', version.current).select('*').maybeSingle();
       if (saveError) throw saveError;
       if (!row) {
         toast.error('Data cabang telah berubah. Data terbaru dimuat; ulangi perubahan Anda.');
@@ -48,7 +48,7 @@ export function useHppData(outletId: string) {
         return false;
       }
       version.current = row.version;
-      setData(next);
+      setData({ materials: row.materials as unknown as Material[], products: row.products as unknown as Product[], fixedCost: Number(row.fixed_cost) });
       return true;
     } catch { toast.error('Data HPP tidak tersimpan. Periksa koneksi atau izin Anda.'); return false; }
     finally { busy.current = false; setSaving(false); }
