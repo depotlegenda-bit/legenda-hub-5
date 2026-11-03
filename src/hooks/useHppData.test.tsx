@@ -21,8 +21,9 @@ beforeEach(() => {
       maybeSingle: async () => {
         const id = String(filters.outlet_id); const row = mock.rows.get(id);
         if (!row || row.version !== filters.version || !payload) return { data: null, error: null };
+        row.materials = payload.materials as unknown[]; row.products = payload.products as unknown[];
         row.fixed_cost = Number(payload.fixed_cost); row.version += 1; mock.writes.push(id);
-        return { data: { version: row.version }, error: null };
+        return { data: { ...row }, error: null };
       },
     };
     return chain;
@@ -54,5 +55,21 @@ describe('outlet HPP rooms', () => {
     await act(async () => { expect(await depot.result.current.save({ materials: [], products: [], fixedCost: 3000 })).toBe(false); });
     await waitFor(() => expect(depot.result.current.data.fixedCost).toBe(9000));
     expect(mock.writes).toEqual([]);
+  });
+  it('persists material and recipe data across a page remount without restoring defaults', async () => {
+    const room = renderHook(() => useHppData('depot'));
+    await waitFor(() => expect(room.result.current.loading).toBe(false));
+    const materials = [{ id: 'bottle', name: 'Sirup', category: 'Bahan Utama', buyUnit: 'botol', buyQty: 2, buyPrice: 60000, baseUnit: 'botol', costPerBaseUnit: 30000 }];
+    const products = [{ id: 'menu', name: 'Menu Baru', category: 'Minuman', targetMargin: 60, customSellingPrice: 20000, overheadCostPerUnit: 1000, ingredients: [{ materialId: 'bottle', qty: 0.1, unit: 'botol' }] }];
+    await act(async () => { expect(await room.result.current.save({ materials, products, fixedCost: 3000 })).toBe(true); });
+    room.unmount();
+    const refreshed = renderHook(() => useHppData('depot'));
+    await waitFor(() => expect(refreshed.result.current.loading).toBe(false));
+    expect(refreshed.result.current.data).toEqual({ materials, products, fixedCost: 3000 });
+    await act(async () => { expect(await refreshed.result.current.save({ materials: [], products: [], fixedCost: 3000 })).toBe(true); });
+    refreshed.unmount();
+    const emptyRoom = renderHook(() => useHppData('depot'));
+    await waitFor(() => expect(emptyRoom.result.current.loading).toBe(false));
+    expect(emptyRoom.result.current.data).toEqual({ materials: [], products: [], fixedCost: 3000 });
   });
 });
