@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
+import { exportSelfieLogsPdf } from '@/lib/selfieLogPdf';
 import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
 import { getAttendanceStatus, formatDiffMinutes, isRoleExempt } from '@/lib/attendanceStatus';
@@ -994,6 +995,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const [outletFilter, setOutletFilter] = usePersistentState<string>('attendance:logs:outletFilter', 'all');
   const [typeFilter, setTypeFilter] = usePersistentState<'all' | 'check_in' | 'check_out'>('attendance:logs:typeFilter', 'all');
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [exportingPhotos, setExportingPhotos] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
   const [rolesByUser, setRolesByUser] = useState<Record<string, string[]>>({});
 
   // Fetch role per user supaya bisa menentukan siapa yang dikecualikan dari ambang waktu.
