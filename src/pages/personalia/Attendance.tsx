@@ -1262,6 +1262,34 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               ]}
               rows={exportRows}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={filtered.length === 0 || exportingPhotos}
+              onClick={async () => {
+                setExportingPhotos(true);
+                setPhotoProgress({ done: 0, total: exportRows.length });
+                try {
+                  await exportSelfieLogsPdf({
+                    filename: `log-absen-selfie-foto-${date}_sd_${dateTo}`,
+                    title: `Log Absen Selfie ${date} s/d ${dateTo}`,
+                    subtitle: outletFilter === 'all' ? 'Semua outlet' : (outletMap.get(outletFilter) || '-'),
+                    rows: exportRows,
+                    onProgress: (done, total) => setPhotoProgress({ done, total }),
+                  });
+                } catch (e: any) {
+                  toast({ title: 'Gagal membuat PDF', description: e?.message, variant: 'destructive' });
+                } finally {
+                  setExportingPhotos(false);
+                  setPhotoProgress(null);
+                }
+              }}
+            >
+              <Camera className="w-4 h-4 mr-1" />
+              {exportingPhotos
+                ? `Foto ${photoProgress?.done ?? 0}/${photoProgress?.total ?? 0}...`
+                : 'PDF + Foto'}
+            </Button>
             {isAdmin && filtered.length > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
