@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
+import { exportSelfieLogsPdf } from '@/lib/selfieLogPdf';
 import { usePersistentDraft } from '@/hooks/usePersistentDraft';
 import { useAttendanceThresholds } from '@/hooks/useAttendanceThresholds';
 import { getAttendanceStatus, formatDiffMinutes, isRoleExempt } from '@/lib/attendanceStatus';
@@ -994,6 +995,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const [outletFilter, setOutletFilter] = usePersistentState<string>('attendance:logs:outletFilter', 'all');
   const [typeFilter, setTypeFilter] = usePersistentState<'all' | 'check_in' | 'check_out'>('attendance:logs:typeFilter', 'all');
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [exportingPhotos, setExportingPhotos] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
   const [rolesByUser, setRolesByUser] = useState<Record<string, string[]>>({});
 
   // Fetch role per user supaya bisa menentukan siapa yang dikecualikan dari ambang waktu.
@@ -1259,6 +1262,34 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
               ]}
               rows={exportRows}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={filtered.length === 0 || exportingPhotos}
+              onClick={async () => {
+                setExportingPhotos(true);
+                setPhotoProgress({ done: 0, total: exportRows.length });
+                try {
+                  await exportSelfieLogsPdf({
+                    filename: `log-absen-selfie-foto-${date}_sd_${dateTo}`,
+                    title: `Log Absen Selfie ${date} s/d ${dateTo}`,
+                    subtitle: outletFilter === 'all' ? 'Semua outlet' : (outletMap.get(outletFilter) || '-'),
+                    rows: exportRows,
+                    onProgress: (done, total) => setPhotoProgress({ done, total }),
+                  });
+                } catch (e: any) {
+                  toast({ title: 'Gagal membuat PDF', description: e?.message, variant: 'destructive' });
+                } finally {
+                  setExportingPhotos(false);
+                  setPhotoProgress(null);
+                }
+              }}
+            >
+              <Camera className="w-4 h-4 mr-1" />
+              {exportingPhotos
+                ? `Foto ${photoProgress?.done ?? 0}/${photoProgress?.total ?? 0}...`
+                : 'PDF + Foto'}
+            </Button>
             {isAdmin && filtered.length > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
