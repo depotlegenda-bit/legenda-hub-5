@@ -989,6 +989,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
   const { resolve: resolveThresholds, shiftsForOutlet, shiftNames } = useAttendanceThresholds();
   const [logs, setLogs] = useState<any[]>([]);
   const [date, setDate] = usePersistentState<string>('attendance:logs:date', new Date().toISOString().split('T')[0]);
+  const [dateTo, setDateTo] = usePersistentState<string>('attendance:logs:dateTo', new Date().toISOString().split('T')[0]);
   const [userFilter, setUserFilter] = usePersistentState<string>('attendance:logs:userFilter', 'all');
   const [outletFilter, setOutletFilter] = usePersistentState<string>('attendance:logs:outletFilter', 'all');
   const [typeFilter, setTypeFilter] = usePersistentState<'all' | 'check_in' | 'check_out'>('attendance:logs:typeFilter', 'all');
@@ -1026,9 +1027,13 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
     // Gunakan rentang waktu LOKAL penuh (00:00:00.000 – 23:59:59.999) lalu konversi ke ISO/UTC,
     // supaya log absensi di jam berapapun (termasuk dini hari & malam) tetap terdeteksi
     // walau created_at di DB tersimpan dalam UTC.
-    const [y, m, d] = date.split('-').map(Number);
+    // Rentang periode: dari tanggal awal sampai tanggal akhir; jika terbalik, tukar agar valid.
+    const from = date <= dateTo ? date : dateTo;
+    const to = date <= dateTo ? dateTo : date;
+    const [y, m, d] = from.split('-').map(Number);
+    const [y2, m2, d2] = to.split('-').map(Number);
     const startLocal = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
-    const endLocal = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+    const endLocal = new Date(y2, (m2 || 1) - 1, d2 || 1, 23, 59, 59, 999);
     supabase
       .from('attendance_logs')
       .select('*')
@@ -1039,7 +1044,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
       .then(({ data }) => setLogs(data || []));
   };
 
-  useEffect(() => { reload(); }, [date, visibleProfiles]);
+  useEffect(() => { reload(); }, [date, dateTo, visibleProfiles]);
 
   useEffect(() => { setUserFilter('all'); }, [outletFilter]);
 
@@ -1197,7 +1202,11 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
         </Tabs>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+          <div className="flex items-center gap-1">
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" aria-label="Dari tanggal" />
+            <span className="text-xs text-muted-foreground">s/d</span>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" aria-label="Sampai tanggal" />
+          </div>
           <div className="inline-flex rounded-md border border-input overflow-hidden">
             {([
               { v: 'all', l: 'Semua' },
@@ -1229,8 +1238,8 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
           <span className="text-sm text-muted-foreground">{filtered.length} log</span>
           <div className="ml-auto flex items-center gap-2 flex-wrap">
             <ExportButtons
-              filename={`log-absen-selfie-${date}`}
-              title={`Log Absen Selfie ${date}`}
+              filename={`log-absen-selfie-${date}_sd_${dateTo}`}
+              title={`Log Absen Selfie ${date} s/d ${dateTo}`}
               subtitle={outletFilter === 'all' ? 'Semua outlet' : (outletMap.get(outletFilter) || '-')}
               orientation="landscape"
               columns={[
@@ -1392,7 +1401,7 @@ function SelfieLogsTab({ outlets, allProfiles, role }: { outlets: { id: string; 
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-muted-foreground">Belum ada log absen selfie pada tanggal ini.</td></tr>
+                <tr><td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-muted-foreground">Belum ada log absen selfie pada periode ini.</td></tr>
               )}
             </tbody>
           </table>
